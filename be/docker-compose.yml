@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 services:
   app:
     build: .
@@ -7,28 +7,22 @@ services:
     depends_on:
       - postgres
       - redis
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=user
-      - DB_PASSWORD=password
-      - DB_NAME=mydb
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - ETHEREUM_NODE_URL=https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
-      - CONTRACT_ADDRESS=YOUR_CONTRACT_ADDRESS
+    env_file:
+      - .env
+    networks:
+      - be
 
   postgres:
     image: postgres:16
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mydb
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - be
 
   redis:
     image: redis:latest
+    networks:
+      - be
 
 volumes:
   postgres-data:
