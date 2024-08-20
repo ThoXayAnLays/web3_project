@@ -1,10 +1,18 @@
 import React from 'react';
+import { Box, Typography, Link } from '@mui/material';
 
 const Footer = () => {
     return (
-        <footer>
-            <p>&copy; 2024 Web3 Project. All rights reserved.</p>
-        </footer>
+        <Box sx={{ bgcolor: 'background.paper', p: 6 }} component="footer">
+            <Typography variant="body2" color="text.secondary" align="center">
+                {'Copyright © '}
+                <Link color="inherit" href="/">
+                    Your DeFi Project
+                </Link>{' '}
+                {new Date().getFullYear()}
+                {'.'}
+            </Typography>
+        </Box>
     );
 };
 

@@ -1,15 +1,19 @@
 const express = require('express');
-const cors = require('cors');
-const transactionRoutes = require('./routes/transactionRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+const dotenv = require('dotenv');
+const apiRoutes = require('./routes/api');
+const cronService = require('./services/cronService');
+
+dotenv.config();
 
 const app = express();
+const port = process.env.PORT || 3000;
 
-app.use(cors());
 app.use(express.json());
+app.use('/api', apiRoutes);
+app.use(errorHandler);
 
-app.use('/api', transactionRoutes);
-app.use('/api/admin', adminRoutes);
+cronService.initializeJobs();
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});

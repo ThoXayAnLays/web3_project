@@ -1,110 +1,93 @@
-import React, { useState, useEffect } from 'react';
-import TransactionList from '../components/TransactionList';
-import Pagination from '../components/Pagination';
-import web3Service from '../services/web3Service';
-import apiService from '../services/apiService';
-import TokenForm from '../components/TokenForm';
+import React, { useState } from 'react';
+import { Container, Typography, TextField, Button, Grid, CircularProgress } from '@mui/material';
+import { depositTokenA, withdrawTokenA } from '../utils/web3';
+import { useWeb3 } from '../context/Web3Context';
+import { toast } from 'react-toastify';
 
 const UserDashboard = () => {
-    const [account, setAccount] = useState('');
-    const [transactions, setTransactions] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [sortBy, setSortBy] = useState('timestamp');
-    const [sortOrder, setSortOrder] = useState('DESC');
-    const [search, setSearch] = useState('');
-    const [amount, setAmount] = useState('');
+    const [depositAmount, setDepositAmount] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { isConnected } = useWeb3();
 
-    useEffect(() => {
-        const init = async () => {
-            const account = await web3Service.connectWallet();
-            setAccount(account);
-            fetchTransactions(account, currentPage, sortBy, sortOrder, search);
-        };
-        init();
-    }, []);
-
-    const fetchTransactions = async (account, page, sortBy, sortOrder, search) => {
-        const result = await apiService.getUserTransactions(account, page, sortBy, sortOrder, search);
-        setTransactions(result.transactions);
-        setTotalPages(result.totalPages);
-    };
-
-    const handleDeposit = async (values, { setSubmitting }) => {
+    const handleDeposit = async () => {
+        if (!isConnected) {
+            toast.error('Please connect your wallet first');
+            return;
+        }
+        setIsLoading(true);
         try {
-            await web3Service.deposit(values.amount);
-            alert('Deposit successful');
-            fetchTransactions(account, currentPage, sortBy, sortOrder, search);
+            await depositTokenA(depositAmount);
+            setDepositAmount('');
+            toast.success('Deposit successful');
         } catch (error) {
-            alert('Deposit failed: ' + error.message);
+            toast.error('Deposit failed: ' + error.message);
         } finally {
-            setSubmitting(false);
+            setIsLoading(false);
         }
     };
 
-    const handleWithdraw = async () => {
+    const handleWithdraw = async (claimOnly) => {
+        if (!isConnected) {
+            toast.error('Please connect your wallet first');
+            return;
+        }
+        setIsLoading(true);
         try {
-            await web3Service.withdraw(amount);
-            alert('Withdrawal successful');
-            fetchTransactions(account, currentPage, sortBy, sortOrder, search);
+            await withdrawTokenA(claimOnly);
+            toast.success(claimOnly ? 'Reward claimed successfully' : 'Withdrawal successful');
         } catch (error) {
-            alert('Withdrawal failed: ' + error.message);
+            toast.error((claimOnly ? 'Claim' : 'Withdrawal') + ' failed: ' + error.message);
+        } finally {
+            setIsLoading(false);
         }
-    };
-
-    const handlePageChange = (page) => {
-        setCurrentPage(page);
-        fetchTransactions(account, page, sortBy, sortOrder, search);
-    };
-
-    const handleSort = (newSortBy) => {
-        const newSortOrder = sortBy === newSortBy && sortOrder === 'ASC' ? 'DESC' : 'ASC';
-        setSortBy(newSortBy);
-        setSortOrder(newSortOrder);
-        fetchTransactions(account, currentPage, newSortBy, newSortOrder, search);
-    };
-
-    const handleSearch = (e) => {
-        e.preventDefault();
-        fetchTransactions(account, 1, sortBy, sortOrder, search);
     };
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold mb-4">User Dashboard</h1>
-            <p className="mb-4">Connected account: <span className="font-mono">{account}</span></p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                <TokenForm onSubmit={handleDeposit} action="Deposit" />
-                <TokenForm onSubmit={handleWithdraw} action="Withdraw" />
-            </div>
-
-            <h2 className="text-2xl font-bold mb-4">Transaction History</h2>
-
-            <form onSubmit={handleSearch} className="mb-4">
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search transactions"
-                    className="p-2 border rounded mr-2"
-                />
-                <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">Search</button>
-            </form>
-
-            <TransactionList
-                transactions={transactions}
-                onSort={handleSort}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-            />
-
-            <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-            />
-        </div>
+        <Container>
+            <Typography variant="h4" component="h1" gutterBottom>
+                User Dashboard
+            </Typography>
+            <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                    <TextField
+                        label="Deposit Amount"
+                        type="number"
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        fullWidth
+                        margin="normal"
+                        disabled={isLoading}
+                    />
+                    <Button
+                        variant="contained"
+                        onClick={handleDeposit}
+                        fullWidth
+                        disabled={isLoading || !depositAmount}
+                    >
+                        {isLoading ? <CircularProgress size={24} /> : 'Deposit Token A'}
+                    </Button>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                    <Button
+                        variant="contained"
+                        onClick={() => handleWithdraw(false)}
+                        fullWidth
+                        disabled={isLoading}
+                    >
+                        {isLoading ? <CircularProgress size={24} /> : 'Withdraw + Claim Reward'}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => handleWithdraw(true)}
+                        fullWidth
+                        sx={{ mt: 2 }}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? <CircularProgress size={24} /> : 'Claim Reward Only'}
+                    </Button>
+                </Grid>
+            </Grid>
+        </Container>
     );
 };
 

@@ -6,17 +6,26 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "crawl": "node scripts/crawlTransactions.js",
+    "migrate": "node-pg-migrate",
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.17.1",
+    "cron": "^3.1.7",
+    "dotenv": "^10.0.0",
+    "ethers": "^5.5.1",
+    "express": "^4.19.2",
+    "joi": "^17.13.3",
     "kue": "^0.11.6",
-    "pg": "^8.7.1",
-    "web3": "^1.6.0"
+    "node-cron": "^3.0.0",
+    "node-pg-migrate": "^7.6.1",
+    "pg": "^8.12.0",
+    "redis": "^4.7.0",
+    "sequelize": "^6.6.5",
+    "web3": "^4.11.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.15"

@@ -1,27 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
-import web3Service from '../services/web3Service';
+import React from 'react';
+import { Typography, Container } from '@mui/material';
 
 const Home = () => {
-    const [account, setAccount] = useState('');
-
-    useEffect(() => {
-        const connectWallet = async () => {
-            const account = await web3Service.connectWallet();
-            setAccount(account);
-        };
-        connectWallet();
-    }, []);
-
     return (
-        <div>
-            <h1>Welcome to Web3 Project</h1>
-            {account ? (
-                <p>Connected account: {account}</p>
-            ) : (
-                <button onClick={web3Service.connectWallet}>Connect Wallet</button>
-            )}
-        </div>
+        <Container>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Welcome to DeFi Project
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+                This is a decentralized finance project where you can stake Token A and earn rewards.
+            </Typography>
+        </Container>
     );
 };
 

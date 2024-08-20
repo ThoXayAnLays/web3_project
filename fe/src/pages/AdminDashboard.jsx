@@ -1,56 +1,54 @@
-import React, { useState, useEffect } from 'react';
-import TransactionList from '../components/TransactionList';
-import Pagination from '../components/Pagination';
-import web3Service from '../services/web3Service';
-import apiService from '../services/apiService';
+import React, { useState } from 'react';
+import { Container, Typography, TextField, Button, CircularProgress } from '@mui/material';
+import { updateAPR } from '../utils/web3';
+import { useWeb3 } from '../context/Web3Context';
+import { toast } from 'react-toastify';
 
 const AdminDashboard = () => {
-    const [transactions, setTransactions] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
     const [newAPR, setNewAPR] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { isConnected } = useWeb3();
 
-    useEffect(() => {
-        fetchTransactions(currentPage);
-    }, []);
-
-    const fetchTransactions = async (page) => {
-        const result = await apiService.getAllTransactions(page);
-        setTransactions(result.transactions);
-        setTotalPages(result.totalPages);
-    };
-
-    const handlePageChange = (page) => {
-        setCurrentPage(page);
-        fetchTransactions(page);
-    };
-
-    const handleAPRUpdate = async () => {
-        await apiService.updateAPR(newAPR);
-        alert('APR updated successfully');
+    const handleUpdateAPR = async () => {
+        if (!isConnected) {
+            toast.error('Please connect your wallet first');
+            return;
+        }
+        setIsLoading(true);
+        try {
+            await updateAPR(newAPR);
+            setNewAPR('');
+            toast.success('APR updated successfully');
+        } catch (error) {
+            toast.error('Failed to update APR: ' + error.message);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <div>
-            <h1>Admin Dashboard</h1>
-            <div>
-                <h2>Update APR</h2>
-                <input
-                    type="number"
-                    value={newAPR}
-                    onChange={(e) => setNewAPR(e.target.value)}
-                    placeholder="New APR"
-                />
-                <button onClick={handleAPRUpdate}>Update APR</button>
-            </div>
-            <h2>All Transactions</h2>
-            <TransactionList transactions={transactions} />
-            <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
+        <Container>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Admin Dashboard
+            </Typography>
+            <TextField
+                label="New APR (%)"
+                type="number"
+                value={newAPR}
+                onChange={(e) => setNewAPR(e.target.value)}
+                fullWidth
+                margin="normal"
+                disabled={isLoading}
             />
-        </div>
+            <Button
+                variant="contained"
+                onClick={handleUpdateAPR}
+                fullWidth
+                disabled={isLoading || !newAPR}
+            >
+                {isLoading ? <CircularProgress size={24} /> : 'Update APR'}
+            </Button>
+        </Container>
     );
 };
 

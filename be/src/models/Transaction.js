@@ -2,9 +2,9 @@ const db = require('../config/database');
 
 class Transaction {
     static async create(data) {
-        const { from, to, value, hash, blockNumber, timestamp } = data;
-        const query = 'INSERT INTO transactions (from_address, to_address, value, hash, block_number, timestamp) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *';
-        const values = [from, to, value, hash, blockNumber, timestamp];
+        const { user, event, amount, timestamp } = data;
+        const query = 'INSERT INTO transactions (user_address, event_type, amount, timestamp) VALUES ($1, $2, $3, $4) RETURNING *';
+        const values = [user, event, amount, timestamp];
         const result = await db.query(query, values);
         return result.rows[0];
     }
@@ -13,7 +13,7 @@ class Transaction {
         const offset = (page - 1) * limit;
         const query = `
       SELECT * FROM transactions
-      WHERE from_address ILIKE $1 OR to_address ILIKE $1 OR hash ILIKE $1
+      WHERE user_address ILIKE $1 OR event_type ILIKE $1
       ORDER BY ${sortBy} ${sortOrder}
       LIMIT $2 OFFSET $3
     `;
@@ -26,7 +26,7 @@ class Transaction {
         const offset = (page - 1) * limit;
         const query = `
       SELECT * FROM transactions
-      WHERE from_address = $1 OR to_address = $1
+      WHERE user_address = $1
       ORDER BY ${sortBy} ${sortOrder}
       LIMIT $2 OFFSET $3
     `;
