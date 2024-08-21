@@ -1,93 +1,61 @@
-import React, { useState } from 'react';
-import { Container, Typography, TextField, Button, Grid, CircularProgress } from '@mui/material';
-import { depositTokenA, withdrawTokenA } from '../utils/web3';
-import { useWeb3 } from '../context/Web3Context';
+import React, { useContext, useState, useEffect } from 'react';
+import { Web3Context } from '../context/Web3Context';
+import StakingForm from '../components/StakingForm';
+import TransactionHistory from '../components/TransactionHistory';
+import Spinner from '../components/Spinner';
 import { toast } from 'react-toastify';
+import contractAddresses from '../contracts/contract-address.json';
+import TokenFaucetABI from '../contracts/TokenFaucet.json';
 
 const UserDashboard = () => {
-    const [depositAmount, setDepositAmount] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const { isConnected } = useWeb3();
+    const { account, web3 } = useContext(Web3Context);
+    const [loading, setLoading] = useState(true);
+    const [tokenFaucetContract, setTokenFaucetContract] = useState(null);
 
-    const handleDeposit = async () => {
-        if (!isConnected) {
-            toast.error('Please connect your wallet first');
+    useEffect(() => {
+        if (web3 && contractAddresses.TokenFaucet) {
+            const faucetContract = new web3.eth.Contract(TokenFaucetABI.abi, contractAddresses.TokenFaucet);
+            setTokenFaucetContract(faucetContract);
+        }
+        // Simulate data loading
+        setTimeout(() => setLoading(false), 1000);
+    }, [web3]);
+
+    const requestTestTokens = async () => {
+        if (!tokenFaucetContract) {
+            toast.error('Token Faucet contract not initialized');
             return;
         }
-        setIsLoading(true);
+
         try {
-            await depositTokenA(depositAmount);
-            setDepositAmount('');
-            toast.success('Deposit successful');
+            await tokenFaucetContract.methods.requestTokens().send({ from: account });
+            toast.success('Test tokens received successfully');
         } catch (error) {
-            toast.error('Deposit failed: ' + error.message);
-        } finally {
-            setIsLoading(false);
+            console.error('Error requesting test tokens:', error);
+            toast.error('Failed to request test tokens. You may need to wait before requesting again.');
         }
     };
 
-    const handleWithdraw = async (claimOnly) => {
-        if (!isConnected) {
-            toast.error('Please connect your wallet first');
-            return;
-        }
-        setIsLoading(true);
-        try {
-            await withdrawTokenA(claimOnly);
-            toast.success(claimOnly ? 'Reward claimed successfully' : 'Withdrawal successful');
-        } catch (error) {
-            toast.error((claimOnly ? 'Claim' : 'Withdrawal') + ' failed: ' + error.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    if (!account) {
+        return <div className="container mx-auto mt-8">Please connect your wallet to view the dashboard.</div>;
+    }
+
+    if (loading) {
+        return <Spinner />;
+    }
 
     return (
-        <Container>
-            <Typography variant="h4" component="h1" gutterBottom>
-                User Dashboard
-            </Typography>
-            <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                    <TextField
-                        label="Deposit Amount"
-                        type="number"
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(e.target.value)}
-                        fullWidth
-                        margin="normal"
-                        disabled={isLoading}
-                    />
-                    <Button
-                        variant="contained"
-                        onClick={handleDeposit}
-                        fullWidth
-                        disabled={isLoading || !depositAmount}
-                    >
-                        {isLoading ? <CircularProgress size={24} /> : 'Deposit Token A'}
-                    </Button>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                    <Button
-                        variant="contained"
-                        onClick={() => handleWithdraw(false)}
-                        fullWidth
-                        disabled={isLoading}
-                    >
-                        {isLoading ? <CircularProgress size={24} /> : 'Withdraw + Claim Reward'}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => handleWithdraw(true)}
-                        fullWidth
-                        sx={{ mt: 2 }}
-                        disabled={isLoading}
-                    >
-                        {isLoading ? <CircularProgress size={24} /> : 'Claim Reward Only'}
-                    </Button>
-                </Grid>
-            </Grid>
-        </Container>
+        <div className="container mx-auto mt-8">
+            <h1 className="text-3xl font-bold mb-8">User Dashboard</h1>
+            <button
+                onClick={requestTestTokens}
+                className="bg-green-500 text-white px-4 py-2 rounded mb-4"
+            >
+                Request Test Tokens
+            </button>
+            <StakingForm />
+            <TransactionHistory />
+        </div>
     );
 };
 

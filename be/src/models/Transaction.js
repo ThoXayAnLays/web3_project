@@ -1,12 +1,12 @@
-const mongoose = require("mongoose");
+// models/Transaction.js
+const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
-    sender: { type: String, required: true },
-    receiver: { type: String, required: true },
-    tokenAmount: { type: Number, required: true },
-    transactionHash: { type: String, required: true },
+    senderAddress: { type: String, required: true },
+    receiverAddress: { type: String, required: true },
+    amount: { type: Number, required: true },
     timestamp: { type: Date, default: Date.now },
+    transactionHash: { type: String, required: true, unique: true }
 });
 
-const Transaction = mongoose.model("Transaction", transactionSchema);
-module.exports = Transaction;
+module.exports = mongoose.model('Transaction', transactionSchema);

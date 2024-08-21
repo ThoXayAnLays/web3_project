@@ -1,11 +1,12 @@
 const path = require("path");
+const { ethers } = require("hardhat");
 
 async function main() {
   if (network.name === "hardhat") {
     console.warn(
       "You are trying to deploy a contract to the Hardhat Network, which" +
-        "gets automatically created and destroyed every time. Use the Hardhat" +
-        " option '--network localhost'"
+      "gets automatically created and destroyed every time. Use the Hardhat" +
+      " option '--network localhost'"
     );
   }
 
@@ -15,8 +16,6 @@ async function main() {
     "Deploying the contracts with the account:",
     await deployer.getAddress()
   );
-
-  //console.log("Account balance:", (await deployer.getBalance()).toString());
 
   const TokenA = await ethers.getContractFactory("TokenA");
   const tokenA = await TokenA.deploy();
@@ -33,10 +32,23 @@ async function main() {
   await staking.waitForDeployment();
   console.log("Staking contract address: ", await staking.getAddress());
 
+  // Deploy TokenFaucet
+  const amountPerRequest = ethers.parseEther("100"); // 100 tokens per request
+  const cooldownPeriod = 30; // 30 seconds for testing, adjust as needed
+  const TokenFaucet = await ethers.getContractFactory("TokenFaucet");
+  const tokenFaucet = await TokenFaucet.deploy(await tokenA.getAddress(), amountPerRequest, cooldownPeriod);
+  await tokenFaucet.waitForDeployment();
+  console.log("Token Faucet address: ", await tokenFaucet.getAddress());
+
+  // Transfer some tokens to the faucet
+  const faucetSupply = ethers.parseEther("1000000"); // 1 million tokens
+  await tokenA.transfer(await tokenFaucet.getAddress(), faucetSupply);
+
   saveFrontendFiles({
     TokenA: await tokenA.getAddress(),
     NFTB: await nftB.getAddress(),
-    Staking: await staking.getAddress()
+    Staking: await staking.getAddress(),
+    TokenFaucet: await tokenFaucet.getAddress()
   });
 }
 
@@ -67,7 +79,8 @@ function saveFrontendFiles(addresses) {
   const myartifacts = [
     "TokenA",
     "NFTB",
-    "Staking"
+    "Staking",
+    "TokenFaucet"
   ];
 
   myartifacts.forEach(artifact => {

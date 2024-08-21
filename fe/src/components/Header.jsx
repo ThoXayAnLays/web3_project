@@ -1,33 +1,42 @@
-import React from 'react';
-import { AppBar, Toolbar, Typography, Button } from '@mui/material';
+import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { useWeb3 } from '../context/Web3Context';
+import { Web3Context } from '../context/Web3Context';
 
 const Header = () => {
-    const { isConnected, userAddress, connectWallet } = useWeb3();
-
-    const handleConnect = async () => {
-        await connectWallet();
-    };
+    const { account, balance, connectWallet, disconnectWallet } = useContext(Web3Context);
 
     return (
-        <AppBar position="static">
-            <Toolbar>
-                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                    <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>DeFi Project</Link>
-                </Typography>
-                <Button color="inherit" component={Link} to="/user">User Dashboard</Button>
-                <Button color="inherit" component={Link} to="/admin">Admin Dashboard</Button>
-                <Button color="inherit" component={Link} to="/transactions">Transactions</Button>
-                {isConnected ? (
-                    <Typography variant="body2" sx={{ ml: 2 }}>
-                        {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
-                    </Typography>
-                ) : (
-                    <Button color="inherit" onClick={handleConnect}>Connect Wallet</Button>
-                )}
-            </Toolbar>
-        </AppBar>
+        <header className="bg-blue-600 text-white p-4">
+            <div className="container mx-auto flex justify-between items-center">
+                <h1 className="text-2xl font-bold">Web3 Project</h1>
+                <nav>
+                    <ul className="flex space-x-4">
+                        <li><Link to="/" className="hover:text-blue-200">Home</Link></li>
+                        {account === import.meta.env.VITE_ADMIN_ADDRESS && (
+                            <>
+                                <li><Link to="/admin" className="hover:text-blue-200">Admin Dashboard</Link></li>
+                                <li><Link to="/cron-jobs" className="hover:text-blue-200">Cron Jobs</Link></li>
+                            </>
+                        )}
+                    </ul>
+                </nav>
+                <div>
+                    {account ? (
+                        <div className="text-sm">
+                            <p>Connected: {account.slice(0, 6)}...{account.slice(-4)}</p>
+                            <p>Balance: {parseFloat(balance).toFixed(4)} TKA</p>
+                            <button onClick={disconnectWallet} className="bg-red-500 text-white px-4 py-2 rounded mt-2 hover:bg-red-600">
+                                Disconnect
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={connectWallet} className="bg-white text-blue-600 px-4 py-2 rounded hover:bg-blue-100">
+                            Connect Wallet
+                        </button>
+                    )}
+                </div>
+            </div>
+        </header>
     );
 };
 

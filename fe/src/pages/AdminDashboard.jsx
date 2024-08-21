@@ -1,54 +1,53 @@
-import React, { useState } from 'react';
-import { Container, Typography, TextField, Button, CircularProgress } from '@mui/material';
-import { updateAPR } from '../utils/web3';
-import { useWeb3 } from '../context/Web3Context';
+import React, { useContext, useState } from 'react';
+import { Web3Context } from '../context/Web3Context';
+import TransactionHistory from '../components/TransactionHistory';
 import { toast } from 'react-toastify';
 
 const AdminDashboard = () => {
+    const { account, stakingContract } = useContext(Web3Context);
     const [newAPR, setNewAPR] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const { isConnected } = useWeb3();
 
-    const handleUpdateAPR = async () => {
-        if (!isConnected) {
-            toast.error('Please connect your wallet first');
+    if (account !== import.meta.env.VITE_ADMIN_ADDRESS) {
+        return <div className="container mx-auto mt-8 text-red-600">Access denied. Admin only.</div>;
+    }
+
+    const handleUpdateAPR = async (e) => {
+        e.preventDefault();
+        if (!newAPR || isNaN(newAPR) || parseFloat(newAPR) < 0) {
+            toast.error('Please enter a valid APR');
             return;
         }
-        setIsLoading(true);
+
         try {
-            await updateAPR(newAPR);
-            setNewAPR('');
+            const aprBasisPoints = Math.floor(parseFloat(newAPR) * 100);
+            await stakingContract.methods.updateBaseAPR(aprBasisPoints).send({ from: account });
             toast.success('APR updated successfully');
+            setNewAPR('');
         } catch (error) {
-            toast.error('Failed to update APR: ' + error.message);
-        } finally {
-            setIsLoading(false);
+            toast.error('Error updating APR');
+            console.error(error);
         }
     };
 
     return (
-        <Container>
-            <Typography variant="h4" component="h1" gutterBottom>
-                Admin Dashboard
-            </Typography>
-            <TextField
-                label="New APR (%)"
-                type="number"
-                value={newAPR}
-                onChange={(e) => setNewAPR(e.target.value)}
-                fullWidth
-                margin="normal"
-                disabled={isLoading}
-            />
-            <Button
-                variant="contained"
-                onClick={handleUpdateAPR}
-                fullWidth
-                disabled={isLoading || !newAPR}
-            >
-                {isLoading ? <CircularProgress size={24} /> : 'Update APR'}
-            </Button>
-        </Container>
+        <div className="container mx-auto mt-8">
+            <h1 className="text-3xl font-bold mb-8 text-gray-800">Admin Dashboard</h1>
+            <form onSubmit={handleUpdateAPR} className="mb-8">
+                <div className="flex items-center">
+                    <input
+                        type="text"
+                        placeholder="New APR (%)"
+                        value={newAPR}
+                        onChange={(e) => setNewAPR(e.target.value)}
+                        className="border rounded px-2 py-1 mr-2 text-gray-700"
+                    />
+                    <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Update APR
+                    </button>
+                </div>
+            </form>
+            <TransactionHistory isAdmin={true} />
+        </div>
     );
 };
 

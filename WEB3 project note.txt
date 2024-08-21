@@ -7,6 +7,7 @@ Mỗi khi user deposit NFT B  thì APR sẽ tăng thêm 2% kể từ thời đi�
 ví dụ: reward = (Token A * 2% * (depositNFTBTime - depositTokenATime)) + ((Token A + Token B) * 10% *(claimRewardTime hoặc withdrawTime - deposit NFTBTime))
 User có thể withdraw khi token không bị lock (người dùng có 2 option là: chỉ claim reward hoặc withdraw + claim reward).
 Admin có quyền update % APR.
+Testnet: https://bsc-testnet-rpc.publicnode.com
 
 FE (sử dụng VITE):
 Use react-toastify for error displaying instead of throw error.
@@ -24,7 +25,9 @@ Admin đăng nhập vào ví metamask, báo lỗi khi không vào đúng mạng 
 Admin page để update % APR và xem giao dịch của tất cả User (paging, sort by time, search).
 Admin page để quản lí cron job.
 
-BE (sử dụng nodejs, và mongoDB):
-Crawl transaction data. Sử dụng Kue scheduler để quản lý jobs, sử dụng cron jobs để bắt được event của smart contracts.
-Quản lý được jobs status, chạy lại jobs nếu fail, tối ưu jobs để không miss data.
+BE (sử dụng nodejs, và mongoDB) để crawl data từ smart contract:
+BE use API folder structure.
+Crawl transaction data (save both sender address and receiver address). Sử dụng Kue scheduler để quản lý jobs, sử dụng cron jobs để bắt được event của smart contracts.
+Quản lý được jobs status, tối ưu jobs để không miss data, trùng lặp data.
 Kết hợp paging, sort, search với FE.
+Khi FE call BE API, show transaction của user account. Show all transaction khi dùng admin account (account address matched address: 0x35C0184F55bb4e99EDFdC94e1067435991481Ea3)

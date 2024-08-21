@@ -1,33 +1,30 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { Web3Provider } from './context/Web3Context';
 import Header from './components/Header';
-import Footer from './components/Footer';
-import Home from './pages/Home';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
-import TransactionHistory from './pages/TransactionHistory';
-import { useWeb3 } from './context/Web3Context';
-
-const ProtectedRoute = ({ children }) => {
-  const { isConnected, isAdmin } = useWeb3();
-  if (!isConnected || !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-  return children;
-};
+import CronJobManager from './pages/CronJobManager';
 
 function App() {
   return (
-    <div>
-      <Header />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/user" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/transactions" element={<TransactionHistory />} />
-      </Routes>
-      <Footer />
-    </div>
+    <Web3Provider>
+      <Router>
+        <div className="flex flex-col min-h-screen bg-gray-100">
+          <Header />
+          <main className="flex-grow p-4">
+            <Routes>
+              <Route path="/" element={<UserDashboard />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/cron-jobs" element={<CronJobManager />} />
+            </Routes>
+          </main>
+          <ToastContainer position="bottom-right" />
+        </div>
+      </Router>
+    </Web3Provider>
   );
 }
 
