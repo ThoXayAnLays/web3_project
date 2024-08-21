@@ -3,14 +3,14 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./ITokenA.sol";
-import "./INFTB.sol";
+import "./TokenA.sol";
+import "./NFTB.sol";
 
 contract Staking is Ownable {
     using Math for uint256;
 
-    ITokenA public tokenA;
-    INFTB public nftB;
+    TokenA public tokenA;
+    NFTB public nftB;
     
     // Struct to store deposit information
     struct Deposit {
@@ -35,8 +35,8 @@ contract Staking is Ownable {
     event APRUpdated(uint256 newBaseAPR);
 
     constructor(address _tokenA, address _nftB) Ownable(msg.sender) {
-        tokenA = ITokenA(_tokenA);
-        nftB = INFTB(_nftB);
+        tokenA = TokenA(_tokenA);
+        nftB = NFTB(_nftB);
     }
 
     function depositTokenA(uint256 amount) external {
@@ -78,12 +78,11 @@ contract Staking is Ownable {
         uint256 amountToWithdraw = claimOnly ? 0 : deposit.amount;
 
         if (claimOnly) {
-            tokenA.mint(msg.sender, reward);
+            tokenA.transfer(msg.sender, reward);
             emit RewardClaimed(msg.sender, reward);
         } else {
-            //uint256 totalAmount = amountToWithdraw + reward;
-            tokenA.transfer(msg.sender, amountToWithdraw);
-            tokenA.mint(msg.sender, reward);
+            uint256 totalAmount = amountToWithdraw + reward;
+            tokenA.transfer(msg.sender, totalAmount);
             delete deposits[msg.sender];
             emit Withdrawn(msg.sender, amountToWithdraw, reward);
         }

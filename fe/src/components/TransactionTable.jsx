@@ -1,5 +1,13 @@
-import React from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import React from "react";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+} from "@mui/material";
 
 const TransactionTable = ({ transactions }) => {
     return (
@@ -8,6 +16,7 @@ const TransactionTable = ({ transactions }) => {
                 <TableHead>
                     <TableRow>
                         <TableCell>User Address</TableCell>
+                        <TableCell>Receiver Address</TableCell>
                         <TableCell>Event Type</TableCell>
                         <TableCell>Amount</TableCell>
                         <TableCell>Timestamp</TableCell>
@@ -17,9 +26,12 @@ const TransactionTable = ({ transactions }) => {
                     {transactions.map((tx, index) => (
                         <TableRow key={index}>
                             <TableCell>{tx.user_address}</TableCell>
+                            <TableCell>{tx.receiver_address}</TableCell>
                             <TableCell>{tx.event_type}</TableCell>
                             <TableCell>{tx.amount}</TableCell>
-                            <TableCell>{new Date(tx.timestamp).toLocaleString()}</TableCell>
+                            <TableCell>
+                                {new Date(tx.timestamp).toLocaleString()}
+                            </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>

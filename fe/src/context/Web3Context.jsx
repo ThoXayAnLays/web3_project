@@ -1,6 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { ethers } from 'ethers';
+import { ethers } from "ethers";
 import { toast } from 'react-toastify';
+
+import stakingAbi from '../contracts/Staking.json';
+import contractAddresses from '../contracts/contract-address.json';
 
 const Web3Context = createContext();
 
@@ -8,6 +11,7 @@ export const Web3Provider = ({ children }) => {
     const [isConnected, setIsConnected] = useState(false);
     const [userAddress, setUserAddress] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
+    const [stakingContract, setStakingContract] = useState(null);
 
     const connectWallet = async () => {
         if (typeof window.ethereum !== 'undefined') {
@@ -23,11 +27,15 @@ export const Web3Provider = ({ children }) => {
                     return false;
                 }
 
+                const stakeContract = new ethers.Contract(contractAddresses.Staking, stakingAbi.abi, signer);
+                setStakingContract(stakeContract);
+
                 setIsConnected(true);
                 setUserAddress(address);
 
-                const isAdminAddress = await checkIfAdmin(address);
+                const isAdminAddress = address.toLowerCase() === "0x35c0184f55bb4e99edfdc94e1067435991481ea3".toLowerCase();
                 setIsAdmin(isAdminAddress);
+
 
                 return true;
             } catch (error) {

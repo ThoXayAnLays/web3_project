@@ -1,0 +1,30 @@
+Smart contract:
+token A (ERC20) có nguồn cung là 100000. Transfer token A từ contract về ví chứ không mint.
+Deposit token A (ERC20) vào với APR = 8%. Token A sau khi được deposit sẽ bị lock 5 phút.
+Khi deposit được 1 lượng token nhất định (trên 1 triệu token) thì nhận được 1 NFT B (ERC721).
+không dùng counter để cộng dồn ID mà dùng safeMath.
+Mỗi khi user deposit NFT B  thì APR sẽ tăng thêm 2% kể từ thời điểm deposit NFT B. Còn trước đó APR vẫn là 8%.
+ví dụ: reward = (Token A * 2% * (depositNFTBTime - depositTokenATime)) + ((Token A + Token B) * 10% *(claimRewardTime hoặc withdrawTime - deposit NFTBTime))
+User có thể withdraw khi token không bị lock (người dùng có 2 option là: chỉ claim reward hoặc withdraw + claim reward).
+Admin có quyền update % APR.
+
+FE (sử dụng VITE):
+Use react-toastify for error displaying instead of throw error.
+Header to connect to metamask and show account balance and use header to navigate pages.
+Check admin role, admin role is account address match with this address 0x35C0184F55bb4e99EDFdC94e1067435991481Ea3
+
+Khi deposit check xem lượng approve còn bao nhiêu, nếu lượng approve còn thì không hiện popup yêu cầu người dùng approve nữa
+
+
+Sign in with metamask, báo lỗi khi không vào đúng mạng BSC Testnet.
+1 page để User thao tác chức năng transfer token A về ví, deposit, withdraw token ERC20.
+1 page để hiển thị lịch sử giao dịch của User (paging, sort by time, search).
+
+Admin đăng nhập vào ví metamask, báo lỗi khi không vào đúng mạng BSC Testnet..
+Admin page để update % APR và xem giao dịch của tất cả User (paging, sort by time, search).
+Admin page để quản lí cron job.
+
+BE (sử dụng nodejs, và mongoDB):
+Crawl transaction data. Sử dụng Kue scheduler để quản lý jobs, sử dụng cron jobs để bắt được event của smart contracts.
+Quản lý được jobs status, chạy lại jobs nếu fail, tối ưu jobs để không miss data.
+Kết hợp paging, sort, search với FE.

@@ -40,15 +40,15 @@ export const depositTokenA = async (amount) => {
     if (!stakingContract) {
         toast.error('Please connect your wallet first');
         return;
-    }
-
-    try {
-        const tx = await stakingContract.depositTokenA(ethers.utils.parseEther(amount));
-        await tx.wait();
-        toast.success('Deposit successful');
-    } catch (error) {
-        console.error('Error depositing:', error);
-        toast.error('Deposit failed');
+    } else {
+        try {
+            const tx = await stakingContract.depositTokenA(ethers.utils.parseEther(amount));
+            await tx.wait();
+            toast.success('Deposit successful');
+        } catch (error) {
+            console.error('Error depositing:', error);
+            toast.error('Deposit failed');
+        }
     }
 };
 
