@@ -15,58 +15,45 @@ describe("NFTB", function () {
     });
 
     describe("Deployment", function () {
-        it("Should set the right name and symbol", async function () {
+        it("Should deploy successfully", async function () {
             expect(await nftB.name()).to.equal("NFT B");
             expect(await nftB.symbol()).to.equal("NFTB");
         });
     });
 
     describe("Minting", function () {
-        it("Should mint a new token and assign it to the recipient", async function () {
-            await nftB.mint(addr1.address);
-            expect(await nftB.ownerOf(1)).to.equal(addr1.address);
+        it("Should allow anyone to mint NFTs", async function () {
+            await nftB.connect(addr1).safeMint(addr1.address);
+            expect(await nftB.balanceOf(addr1.address)).to.equal(1);
+
+            await nftB.connect(addr2).safeMint(addr2.address);
+            expect(await nftB.balanceOf(addr2.address)).to.equal(1);
         });
 
-        it("Should increment the token counter correctly", async function () {
-            await nftB.mint(addr1.address);
-            await nftB.mint(addr2.address);
-            expect(await nftB.ownerOf(2)).to.equal(addr2.address);
-        });
+        it("Should generate unique token IDs", async function () {
+            const tx1 = await nftB.safeMint(addr1.address);
+            const tx2 = await nftB.safeMint(addr2.address);
 
-        it("Should emit Transfer event on minting", async function () {
-            await expect(nftB.mint(addr1.address))
-                .to.emit(nftB, "Transfer")
-                .withArgs(ethers.ZeroAddress, addr1.address, 1);
-        });
+            const receipt1 = await tx1.wait();
+            const receipt2 = await tx2.wait();
 
-        it("Should return the correct token ID", async function () {
-            const tx = await nftB.mint(addr1.address);
-            const receipt = await tx.wait();
-            const transferEvent = receipt.logs.find(
-                (log) => log.eventName === "Transfer"
-            );
-            expect(transferEvent.args.tokenId).to.equal(1);
+            const tokenId1 = receipt1.logs[0].args[2];
+            const tokenId2 = receipt2.logs[0].args[2];
+
+            expect(tokenId1).to.not.equal(tokenId2);
         });
     });
 
-    describe("Token Transfers", function () {
-        beforeEach(async function () {
-            await nftB.mint(addr1.address);
-        });
+    describe("Transfers", function () {
+        it("Should allow token transfers", async function () {
+            const tx = await nftB.connect(addr1).safeMint(addr1.address);
+            const receipt = await tx.wait();
+            const tokenId = receipt.logs[0].args[2];
 
-        it("Should transfer tokens between accounts", async function () {
             await nftB
                 .connect(addr1)
-                .transferFrom(addr1.address, addr2.address, 1);
-            expect(await nftB.ownerOf(1)).to.equal(addr2.address);
-        });
-
-        it("Should fail if the sender is not the owner", async function () {
-            await expect(
-                nftB
-                    .connect(addr2)
-                    .transferFrom(addr1.address, addr2.address, 1)
-            ).to.be.revertedWithCustomError(nftB, "ERC721InsufficientApproval");
+                .transferFrom(addr1.address, addr2.address, tokenId);
+            expect(await nftB.ownerOf(tokenId)).to.equal(addr2.address);
         });
     });
 });

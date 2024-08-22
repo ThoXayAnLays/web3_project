@@ -1,12 +1,47 @@
-// models/Transaction.js
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+const mongoosePaginate = require("mongoose-paginate-v2");
 
 const transactionSchema = new mongoose.Schema({
-    senderAddress: { type: String, required: true },
-    receiverAddress: { type: String, required: true },
-    amount: { type: Number, required: true },
-    timestamp: { type: Date, default: Date.now },
-    transactionHash: { type: String, required: true, unique: true }
+    fromAddress: {
+        type: String,
+        required: true,
+        index: true,
+    },
+    toAddress: {
+        type: String,
+        required: true,
+        index: true,
+    },
+    eventType: {
+        type: String,
+        required: true,
+        enum: [
+            "DepositTokenA",
+            "DepositNFTB",
+            "Withdraw",
+            "ClaimReward",
+            "UpdateAPR",
+        ],
+        index: true,
+    },
+    amount: {
+        type: String,
+        required: true,
+    },
+    timestamp: {
+        type: Date,
+        required: true,
+        index: true,
+    },
+    transactionHash: {
+        type: String,
+        required: true,
+        unique: true,
+    },
 });
 
-module.exports = mongoose.model('Transaction', transactionSchema);
+transactionSchema.plugin(mongoosePaginate);
+
+const Transaction = mongoose.model("Transaction", transactionSchema);
+
+module.exports = Transaction;

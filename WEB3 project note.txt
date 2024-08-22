@@ -1,33 +1,56 @@
 Smart contract:
-token A (ERC20) có nguồn cung là 100000. Transfer token A từ contract về ví chứ không mint.
-Deposit token A (ERC20) vào với APR = 8%. Token A sau khi được deposit sẽ bị lock 5 phút.
+token A (ERC20) có nguồn cung là 100000000. Làm thế nào để user không Mint token A trực tiếp về ví và không dùng faucet token mà user vẫn có token để sử dụng.
+Deposit token A (ERC20) vào với base APR = 8%. Token A sau khi được deposit sẽ bị lock 5 phút.
 Khi deposit được 1 lượng token nhất định (trên 1 triệu token) thì nhận được 1 NFT B (ERC721).
-không dùng counter để cộng dồn ID mà dùng safeMath.
-Mỗi khi user deposit NFT B  thì APR sẽ tăng thêm 2% kể từ thời điểm deposit NFT B. Còn trước đó APR vẫn là 8%.
+không dùng counter để cộng dồn ID mà dùng Math.
+Mỗi khi user deposit NFT B thì APR sẽ tăng thêm 2% với mỗi NFT B được deposit kể từ thời điểm deposit NFT B. Còn trước đó APR vẫn là 8%.
 ví dụ: reward = (Token A * 2% * (depositNFTBTime - depositTokenATime)) + ((Token A + Token B) * 10% *(claimRewardTime hoặc withdrawTime - deposit NFTBTime))
 User có thể withdraw khi token không bị lock (người dùng có 2 option là: chỉ claim reward hoặc withdraw + claim reward).
-Admin có quyền update % APR.
-Testnet: https://bsc-testnet-rpc.publicnode.com
+Admin có quyền update % của base APR.
+Testnet: https://linea-sepolia.infura.io/v3/3c6c81e9dcee4001b676c3ddb43e9f20
 
 FE (sử dụng VITE):
+Use MUI to css.
 Use react-toastify for error displaying instead of throw error.
 Header to connect to metamask and show account balance and use header to navigate pages.
 Check admin role, admin role is account address match with this address 0x35C0184F55bb4e99EDFdC94e1067435991481Ea3
 
 Khi deposit check xem lượng approve còn bao nhiêu, nếu lượng approve còn thì không hiện popup yêu cầu người dùng approve nữa
 
-
-Sign in with metamask, báo lỗi khi không vào đúng mạng BSC Testnet.
-1 page để User thao tác chức năng transfer token A về ví, deposit, withdraw token ERC20.
-1 page để hiển thị lịch sử giao dịch của User (paging, sort by time, search).
+Sign in with metamask, báo lỗi khi không vào đúng mạng Linea Sepolia Testnet.
+1 page để User thao tác chức năng get token A về ví, deposit token A, deposit NFTB, withdraw token A, widraw NFTB, claim reward.
+1 page để hiển thị lịch sử giao dịch của User (paging, sort by event or time, search).
 
 Admin đăng nhập vào ví metamask, báo lỗi khi không vào đúng mạng BSC Testnet..
-Admin page để update % APR và xem giao dịch của tất cả User (paging, sort by time, search).
+Admin page để update % APR và xem giao dịch của tất cả User (paging, sort by event or time, search).
 Admin page để quản lí cron job.
 
-BE (sử dụng nodejs, và mongoDB) để crawl data từ smart contract:
+be sure review my smart contract code and BE code to code FE.
+
+header is use to connect metamask, display balance, display base default APR, navigate through page.
+
+I want when reload page required user no need to reconnect wallet to get data. I suggest use provider context so user does not required to reconnect to wallet.
+
+I want user are required to use exactly linea sepolia testnet then allow user to interact with website.
+
+When connect to metamask success, show both token A and NFT B balance.
+
+I want to use spinner to wait for fetching data.
+
+In staking info, show amount token A and NFT B deposited, show current APR, show time lock counter, show reward.
+
+Admin page để update % APR và xem giao dịch của tất cả User (paging, sort by event or time, search).
+1 page để hiển thị lịch sử giao dịch của User (paging, sort by event or time, search).
+
+I want secrets in code are called from .env file
+my env : VITE_ADMIN_ADDRESS=0x35C0184F55bb4e99EDFdC94e1067435991481Ea3
+VITE_BE_API=http://localhost:3000/api
+VITE_TESTNET_RPC_URL=https://linea-sepolia.infura.io/v3/3c6c81e9dcee4001b676c3ddb43e9f20
+VITE_TESTNET_CHAIN_ID=59141
+
+BE (sử dụng nodejs, và mongoDB, using node-schedule not bullmq or kue) để crawl data từ smart contract:
 BE use API folder structure.
-Crawl transaction data (save both sender address and receiver address). Sử dụng Kue scheduler để quản lý jobs, sử dụng cron jobs để bắt được event của smart contracts.
+Crawl transaction event data trực tiếp từ smart contract: Deposit TokenA Event, Deposit NFTB Event, Withdraw Event, Claim Reward Event, Update APR Event (save both from address and to address). Sử dụng Kue scheduler để quản lý jobs, sử dụng cron jobs để bắt được event của smart contracts.
 Quản lý được jobs status, tối ưu jobs để không miss data, trùng lặp data.
-Kết hợp paging, sort, search với FE.
+Kết hợp paging, sort by event or time, search với FE.
 Khi FE call BE API, show transaction của user account. Show all transaction khi dùng admin account (account address matched address: 0x35C0184F55bb4e99EDFdC94e1067435991481Ea3)

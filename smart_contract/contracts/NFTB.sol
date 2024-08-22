@@ -1,22 +1,17 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract NFTB is ERC721 {
-    using Math for uint256;
-    uint256 private _nftCounter;
+    uint256 private _tokenIdCounter;
 
-    constructor() ERC721("NFT B", "NFTB") {
-        _nftCounter = 0;
-    }
+    constructor() ERC721("NFT B", "NFTB") {}
 
-    function mint(address to) external returns (uint256) {
-        (bool success, uint256 result) = _nftCounter.tryAdd(1);
-        require(success, "Addition overflow");
-        _nftCounter = result;
-        _safeMint(to, _nftCounter);
-        return _nftCounter;
+    function safeMint(address to) public returns (uint256) {
+        uint256 tokenId = uint256(keccak256(abi.encodePacked(block.timestamp, to, _tokenIdCounter)));
+        _safeMint(to, tokenId);
+        _tokenIdCounter++;
+        return tokenId;
     }
 }

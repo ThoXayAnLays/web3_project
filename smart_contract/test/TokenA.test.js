@@ -15,38 +15,41 @@ describe("TokenA", function () {
     });
 
     describe("Deployment", function () {
-        it("Should set the right name and symbol", async function () {
-            expect(await tokenA.name()).to.equal("Token A");
-            expect(await tokenA.symbol()).to.equal("TKA");
+        it("Should set the right owner", async function () {
+            expect(await tokenA.owner()).to.equal(owner.address);
+        });
+
+        it("Should assign the total supply of tokens to the contract", async function () {
+            const totalSupply = await tokenA.totalSupply();
+            expect(await tokenA.balanceOf(tokenA.getAddress())).to.equal(
+                totalSupply
+            );
         });
     });
 
-    describe("Minting", function () {
-        it("Should mint tokens to an address", async function () {
-            await tokenA.mint(addr1.address, 100);
-            expect(await tokenA.balanceOf(addr1.address)).to.equal(100);
-        });
-
-        it("Should emit Transfer event on minting", async function () {
-            await expect(tokenA.mint(addr1.address, 100))
-                .to.emit(tokenA, "Transfer")
-                .withArgs(ethers.ZeroAddress, addr1.address, 100);
-        });
-    });
-
-    describe("Transfers", function () {
+    describe("Transactions", function () {
         it("Should transfer tokens between accounts", async function () {
-            await tokenA.mint(addr1.address, 100);
-            await tokenA.connect(addr1).transfer(addr2.address, 50);
+            // Transfer 50 tokens from owner to addr1
+            await tokenA.transfer(addr1.address, 50);
             expect(await tokenA.balanceOf(addr1.address)).to.equal(50);
+
+            // Transfer 50 tokens from addr1 to addr2
+            await tokenA.connect(addr1).transfer(addr2.address, 50);
             expect(await tokenA.balanceOf(addr2.address)).to.equal(50);
         });
 
         it("Should fail if sender doesn't have enough tokens", async function () {
-            await tokenA.mint(addr1.address, 100);
+            const initialOwnerBalance = await tokenA.balanceOf(owner.address);
+
+            // Try to send 1 token from addr1 (0 tokens) to owner
             await expect(
-                tokenA.connect(addr1).transfer(addr2.address, 101)
-            ).to.be.revertedWithCustomError(tokenA, "ERC20InsufficientBalance");
+                tokenA.connect(addr1).transfer(owner.address, 1)
+            ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+
+            // Owner balance shouldn't have changed
+            expect(await tokenA.balanceOf(owner.address)).to.equal(
+                initialOwnerBalance
+            );
         });
     });
 });

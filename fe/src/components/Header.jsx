@@ -1,42 +1,45 @@
 import React, { useContext } from 'react';
+import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { Web3Context } from '../context/Web3Context';
+import { Web3Context } from '../contexts/Web3Provider';
 
 const Header = () => {
-    const { account, balance, connectWallet, disconnectWallet } = useContext(Web3Context);
+    const { account, tokenABalance, nftBBalance, baseAPR, connectWallet, disconnectWallet } = useContext(Web3Context);
 
     return (
-        <header className="bg-blue-600 text-white p-4">
-            <div className="container mx-auto flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Web3 Project</h1>
-                <nav>
-                    <ul className="flex space-x-4">
-                        <li><Link to="/" className="hover:text-blue-200">Home</Link></li>
-                        {account === import.meta.env.VITE_ADMIN_ADDRESS && (
-                            <>
-                                <li><Link to="/admin" className="hover:text-blue-200">Admin Dashboard</Link></li>
-                                <li><Link to="/cron-jobs" className="hover:text-blue-200">Cron Jobs</Link></li>
-                            </>
-                        )}
-                    </ul>
-                </nav>
-                <div>
-                    {account ? (
-                        <div className="text-sm">
-                            <p>Connected: {account.slice(0, 6)}...{account.slice(-4)}</p>
-                            <p>Balance: {parseFloat(balance).toFixed(4)} TKA</p>
-                            <button onClick={disconnectWallet} className="bg-red-500 text-white px-4 py-2 rounded mt-2 hover:bg-red-600">
-                                Disconnect
-                            </button>
-                        </div>
-                    ) : (
-                        <button onClick={connectWallet} className="bg-white text-blue-600 px-4 py-2 rounded hover:bg-blue-100">
-                            Connect Wallet
-                        </button>
+        <AppBar position="static">
+            <Toolbar>
+                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                    Web3 Project
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Button color="inherit" component={Link} to="/">Home</Button>
+                    <Button color="inherit" component={Link} to="/transactions">Transactions</Button>
+                    {account === import.meta.env.VITE_ADMIN_ADDRESS && (
+                        <Button color="inherit" component={Link} to="/admin">Admin</Button>
                     )}
-                </div>
-            </div>
-        </header>
+                    {account ? (
+                        <>
+                            <Typography variant="body2" sx={{ mx: 2 }}>
+                                Token A: {tokenABalance}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mx: 2 }}>
+                                NFT B: {nftBBalance}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mx: 2 }}>
+                                Base APR: {baseAPR}%
+                            </Typography>
+                            <Typography variant="body2" sx={{ mx: 2 }}>
+                                {account.slice(0, 6)}...{account.slice(-4)}
+                            </Typography>
+                            <Button color="inherit" onClick={disconnectWallet}>Disconnect</Button>
+                        </>
+                    ) : (
+                        <Button color="inherit" onClick={connectWallet}>Connect Wallet</Button>
+                    )}
+                </Box>
+            </Toolbar>
+        </AppBar>
     );
 };
 

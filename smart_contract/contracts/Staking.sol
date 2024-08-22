@@ -1,35 +1,31 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./TokenA.sol";
 import "./NFTB.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract Staking is Ownable {
-    using Math for uint256;
-
     TokenA public tokenA;
     NFTB public nftB;
-    
-    // Struct to store deposit information
-    struct Deposit {
+
+    uint256 public constant LOCK_PERIOD = 5 minutes;
+    uint256 public constant NFT_THRESHOLD = 1000000 * 10**18;
+    uint256 public baseAPR = 800; // 8% in basis points
+    uint256 public nftBonusAPR = 200; // 2% in basis points
+
+    struct Stake {
         uint256 amount;
-        uint256 depositTime;
+        uint256 timestamp;
         uint256 nftDepositTime;
-        bool hasNFT;
+        uint256 nftCount;
     }
 
-    // Mapping to store user deposits
-    mapping(address => Deposit) public deposits;
-
-    uint256 public baseAPR = 800; // 8% * 100 for precision
-    uint256 public nftAPR = 200; // 2% * 100 for precision
-    uint256 public constant LOCK_PERIOD = 5 minutes;
-    uint256 public constant MIN_AMOUNT_FOR_NFT = 1_000_000 * 10**18; // Assuming 18 decimals
+    mapping(address => Stake) public stakes;
 
     event Deposited(address indexed user, uint256 amount);
-    event NFTMinted(address indexed user, uint256 tokenId);
+    event NFTDeposited(address indexed user, uint256 tokenId);
     event Withdrawn(address indexed user, uint256 amount, uint256 reward);
     event RewardClaimed(address indexed user, uint256 reward);
     event APRUpdated(uint256 newBaseAPR);
@@ -39,83 +35,89 @@ contract Staking is Ownable {
         nftB = NFTB(_nftB);
     }
 
-    function depositTokenA(uint256 amount) external {
+    function deposit(uint256 amount) external {
         require(amount > 0, "Amount must be greater than 0");
-        require(tokenA.balanceOf(msg.sender) >= amount, "Insufficient balance");
+        require(tokenA.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
-        // Transfer tokens from user to contract
-        tokenA.transferFrom(msg.sender, address(this), amount);
-
-        // Update or create deposit
-        Deposit storage deposit = deposits[msg.sender];
-        if (deposit.amount == 0) {
-            deposit.amount = amount;
-            deposit.depositTime = block.timestamp;
-        } else {
-            // If there's an existing deposit, calculate and add reward first
+        Stake storage stake = stakes[msg.sender];
+        if (stake.amount > 0) {
             uint256 reward = calculateReward(msg.sender);
-            deposit.amount = deposit.amount + amount + reward;
-            deposit.depositTime = block.timestamp;
+            stake.amount += reward;
         }
 
-        // Mint NFT if eligible
-        if (deposit.amount >= MIN_AMOUNT_FOR_NFT && !deposit.hasNFT) {
-            uint256 tokenId = nftB.mint(msg.sender);
-            deposit.hasNFT = true;
-            deposit.nftDepositTime = block.timestamp;
-            emit NFTMinted(msg.sender, tokenId);
+        stake.amount += amount;
+        stake.timestamp = block.timestamp;
+
+        if (stake.amount >= NFT_THRESHOLD && stake.nftCount == 0) {
+            uint256 tokenId = nftB.safeMint(msg.sender);
+            stake.nftCount++;
+            emit NFTDeposited(msg.sender, tokenId);
         }
 
         emit Deposited(msg.sender, amount);
     }
 
-    function withdraw(bool claimOnly) external {
-        Deposit storage deposit = deposits[msg.sender];
-        require(deposit.amount > 0, "No deposit found");
-        require(block.timestamp >= deposit.depositTime + LOCK_PERIOD, "Tokens are still locked");
+    function depositNFT(uint256 tokenId) external {
+        require(nftB.ownerOf(tokenId) == msg.sender, "You don't own this NFT");
+        nftB.transferFrom(msg.sender, address(this), tokenId);
+
+        Stake storage stake = stakes[msg.sender];
+        if (stake.nftDepositTime == 0) {
+            stake.nftDepositTime = block.timestamp;
+        }
+        stake.nftCount++;
+
+        emit NFTDeposited(msg.sender, tokenId);
+    }
+
+    function withdraw() external {
+        Stake storage stake = stakes[msg.sender];
+        require(stake.amount > 0, "No stake to withdraw");
+        require(block.timestamp >= stake.timestamp + LOCK_PERIOD, "Tokens are still locked");
 
         uint256 reward = calculateReward(msg.sender);
-        uint256 amountToWithdraw = claimOnly ? 0 : deposit.amount;
+        uint256 totalAmount = stake.amount + reward;
 
-        if (claimOnly) {
-            tokenA.transfer(msg.sender, reward);
-            emit RewardClaimed(msg.sender, reward);
-        } else {
-            uint256 totalAmount = amountToWithdraw + reward;
-            tokenA.transfer(msg.sender, totalAmount);
-            delete deposits[msg.sender];
-            emit Withdrawn(msg.sender, amountToWithdraw, reward);
+        require(tokenA.transfer(msg.sender, totalAmount), "Transfer failed");
+
+        emit Withdrawn(msg.sender, stake.amount, reward);
+
+        delete stakes[msg.sender];
+    }
+
+    function claimReward() external {
+        uint256 reward = calculateReward(msg.sender);
+        require(reward > 0, "No reward to claim");
+
+        require(tokenA.transfer(msg.sender, reward), "Transfer failed");
+
+        Stake storage stake = stakes[msg.sender];
+        stake.timestamp = block.timestamp;
+        if (stake.nftDepositTime > 0) {
+            stake.nftDepositTime = block.timestamp;
         }
+
+        emit RewardClaimed(msg.sender, reward);
     }
 
     function calculateReward(address user) public view returns (uint256) {
-        Deposit storage deposit = deposits[user];
-        if (deposit.amount == 0) return 0;
+        Stake storage stake = stakes[user];
+        if (stake.amount == 0) return 0;
 
-        uint256 duration;
-        uint256 rate;
+        uint256 duration = block.timestamp - stake.timestamp;
         uint256 reward;
 
-        if (deposit.hasNFT) {
-            // Calculate reward for the period before NFT deposit
-            duration = deposit.nftDepositTime - deposit.depositTime;
-            rate = baseAPR;
-            reward = (deposit.amount * rate * duration) / (10000 * 365 days);
-
-            // Calculate reward for the period after NFT deposit
-            duration = block.timestamp - deposit.nftDepositTime;
-            rate = baseAPR + nftAPR;
-            reward += (deposit.amount * rate * duration) / (10000 * 365 days);
+        if (stake.nftDepositTime > 0) {
+            uint256 baseReward = stake.amount * baseAPR * (stake.nftDepositTime - stake.timestamp) / (365 days * 10000);
+            uint256 bonusReward = stake.amount * (baseAPR + nftBonusAPR * stake.nftCount) * (block.timestamp - stake.nftDepositTime) / (365 days * 10000);
+            reward = baseReward + bonusReward;
         } else {
-            duration = block.timestamp - deposit.depositTime;
-            rate = baseAPR;
-            reward = (deposit.amount * rate * duration) / (10000 * 365 days);
+            reward = stake.amount * baseAPR * duration / (365 days * 10000);
         }
 
         return reward;
     }
 
-    // Function for admin to update base APR
     function updateBaseAPR(uint256 newBaseAPR) external onlyOwner {
         baseAPR = newBaseAPR;
         emit APRUpdated(newBaseAPR);

@@ -10,46 +10,47 @@ async function main() {
     );
   }
 
-  // ethers is available in the global scope
   const [deployer] = await ethers.getSigners();
   console.log(
     "Deploying the contracts with the account:",
     await deployer.getAddress()
   );
 
-  const TokenA = await ethers.getContractFactory("TokenA");
-  const tokenA = await TokenA.deploy();
-  await tokenA.waitForDeployment();
-  console.log("Token A address: ", await tokenA.getAddress());
+  try {
+    // Deploy TokenA
+    console.log("Deploying TokenA...");
+    const TokenA = await ethers.getContractFactory("TokenA");
+    const tokenA = await TokenA.deploy();
+    await tokenA.deployed();
+    console.log("Token A address: ", tokenA.address);
 
-  const NFTB = await ethers.getContractFactory("NFTB");
-  const nftB = await NFTB.deploy();
-  await nftB.waitForDeployment();
-  console.log("NFT B address: ", await nftB.getAddress());
+    // Deploy NFTB
+    console.log("Deploying NFTB...");
+    const NFTB = await ethers.getContractFactory("NFTB");
+    const nftB = await NFTB.deploy();
+    await nftB.deployed();
+    console.log("NFT B address: ", nftB.address);
 
-  const Staking = await ethers.getContractFactory("Staking");
-  const staking = await Staking.deploy(await tokenA.getAddress(), await nftB.getAddress());
-  await staking.waitForDeployment();
-  console.log("Staking contract address: ", await staking.getAddress());
+    // Deploy Staking
+    console.log("Deploying Staking...");
+    const Staking = await ethers.getContractFactory("Staking");
+    const staking = await Staking.deploy(tokenA.address, nftB.address);
+    await staking.deployed();
+    console.log("Staking contract address: ", staking.address);
 
-  // Deploy TokenFaucet
-  const amountPerRequest = ethers.parseEther("100"); // 100 tokens per request
-  const cooldownPeriod = 30; // 30 seconds for testing, adjust as needed
-  const TokenFaucet = await ethers.getContractFactory("TokenFaucet");
-  const tokenFaucet = await TokenFaucet.deploy(await tokenA.getAddress(), amountPerRequest, cooldownPeriod);
-  await tokenFaucet.waitForDeployment();
-  console.log("Token Faucet address: ", await tokenFaucet.getAddress());
+    // Save frontend files
+    console.log("Saving frontend files...");
+    saveFrontendFiles({
+      TokenA: tokenA.address,
+      NFTB: nftB.address,
+      Staking: staking.address,
+    });
 
-  // Transfer some tokens to the faucet
-  const faucetSupply = ethers.parseEther("1000000"); // 1 million tokens
-  await tokenA.transfer(await tokenFaucet.getAddress(), faucetSupply);
-
-  saveFrontendFiles({
-    TokenA: await tokenA.getAddress(),
-    NFTB: await nftB.getAddress(),
-    Staking: await staking.getAddress(),
-    TokenFaucet: await tokenFaucet.getAddress()
-  });
+    console.log("Deployment completed successfully.");
+  } catch (error) {
+    console.error("Error during deployment:", error);
+    process.exit(1);
+  }
 }
 
 function saveFrontendFiles(addresses) {
@@ -57,7 +58,7 @@ function saveFrontendFiles(addresses) {
   const contractsDir = path.join(__dirname, "..", "..", "fe", "src", "contracts");
 
   if (!fs.existsSync(contractsDir)) {
-    fs.mkdirSync(contractsDir);
+    fs.mkdirSync(contractsDir, { recursive: true });
   }
 
   fs.writeFileSync(
@@ -68,7 +69,7 @@ function saveFrontendFiles(addresses) {
   const beContractDir = path.join(__dirname, "..", "..", "be", "src", "contracts");
 
   if (!fs.existsSync(beContractDir)) {
-    fs.mkdirSync(beContractDir);
+    fs.mkdirSync(beContractDir, { recursive: true });
   }
 
   fs.writeFileSync(
@@ -80,7 +81,6 @@ function saveFrontendFiles(addresses) {
     "TokenA",
     "NFTB",
     "Staking",
-    "TokenFaucet"
   ];
 
   myartifacts.forEach(artifact => {
@@ -89,10 +89,6 @@ function saveFrontendFiles(addresses) {
       path.join(contractsDir, `${artifact}.json`),
       JSON.stringify(ContractArtifact, null, 2)
     );
-  });
-
-  myartifacts.forEach(artifact => {
-    const ContractArtifact = artifacts.readArtifactSync(artifact);
     fs.writeFileSync(
       path.join(beContractDir, `${artifact}.json`),
       JSON.stringify(ContractArtifact, null, 2)
@@ -103,6 +99,6 @@ function saveFrontendFiles(addresses) {
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error(error);
+    console.error("Unhandled error during deployment:", error);
     process.exit(1);
   });
