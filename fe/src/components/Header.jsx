@@ -1,46 +1,42 @@
-import React, { useContext } from 'react';
-import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
-import { Link } from 'react-router-dom';
-import { Web3Context } from '../contexts/Web3Provider';
+import React from 'react'
+import { Link } from 'react-router-dom'
+import { useWeb3 } from '../contexts/Web3Context'
+import { Button, Typography } from '@mui/material'
 
 const Header = () => {
-    const { account, tokenABalance, nftBBalance, baseAPR, connectWallet, disconnectWallet } = useContext(Web3Context);
+    const { address, isAdmin, connectWallet, tokenABalance, nftBBalance, baseAPR } = useWeb3()
 
     return (
-        <AppBar position="static">
-            <Toolbar>
-                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                    Web3 Project
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Button color="inherit" component={Link} to="/">Home</Button>
-                    <Button color="inherit" component={Link} to="/transactions">Transactions</Button>
-                    {account === import.meta.env.VITE_ADMIN_ADDRESS && (
-                        <Button color="inherit" component={Link} to="/admin">Admin</Button>
+        <header className="bg-gray-800 text-white p-4">
+            <div className="container mx-auto flex justify-between items-center">
+                <nav>
+                    <ul className="flex space-x-4">
+                        <li><Link to="/">Home</Link></li>
+                        <li><Link to="/history">History</Link></li>
+                        {isAdmin && <li><Link to="/admin">Admin</Link></li>}
+                    </ul>
+                </nav>
+                <div className="flex items-center space-x-4">
+                    {baseAPR !== null && (
+                        <Typography variant="body2" className="text-yellow-400">
+                            Base APR: {baseAPR}%
+                        </Typography>
                     )}
-                    {account ? (
+                    {address ? (
                         <>
-                            <Typography variant="body2" sx={{ mx: 2 }}>
-                                Token A: {tokenABalance}
-                            </Typography>
-                            <Typography variant="body2" sx={{ mx: 2 }}>
-                                NFT B: {nftBBalance}
-                            </Typography>
-                            <Typography variant="body2" sx={{ mx: 2 }}>
-                                Base APR: {baseAPR}%
-                            </Typography>
-                            <Typography variant="body2" sx={{ mx: 2 }}>
-                                {account.slice(0, 6)}...{account.slice(-4)}
-                            </Typography>
-                            <Button color="inherit" onClick={disconnectWallet}>Disconnect</Button>
+                            <span>TokenA: {tokenABalance}</span>
+                            <span>NFTB: {nftBBalance}</span>
+                            <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
                         </>
                     ) : (
-                        <Button color="inherit" onClick={connectWallet}>Connect Wallet</Button>
+                        <Button variant="contained" color="primary" onClick={() => connectWallet(window.ethereum)}>
+                            Connect Wallet
+                        </Button>
                     )}
-                </Box>
-            </Toolbar>
-        </AppBar>
-    );
-};
+                </div>
+            </div>
+        </header>
+    )
+}
 
-export default Header;
+export default Header
