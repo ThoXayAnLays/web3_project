@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TokenA is ERC20, Ownable {
     uint256 public constant TOTAL_SUPPLY = 1000000000 * 10**18;
-    uint256 public constant MAX_FAUCET_AMOUNT = 5000000 * 10**18; // 1000000 tokens
+    uint256 public constant MAX_FAUCET_AMOUNT = 5000000 * 10**18; // 5000000 tokens
 
     constructor() ERC20("Token A", "TKA") Ownable(msg.sender) {
         _mint(address(this), TOTAL_SUPPLY);

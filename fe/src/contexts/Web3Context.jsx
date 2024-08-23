@@ -56,30 +56,29 @@ export const Web3Provider = ({ children }) => {
     const connectWallet = async (provider) => {
         if (provider) {
             try {
-                const accounts = await provider.listAccounts()
-                if (accounts.length > 0) {
-                    const signer = provider.getSigner()
-                    const address = await signer.getAddress()
-                    setSigner(signer)
-                    setAddress(address)
-                    setIsAdmin(address.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS.toLowerCase())
+                // Request account access
+                await provider.send('eth_requestAccounts', []);
+                const signer = provider.getSigner()
+                const address = await signer.getAddress()
+                setSigner(signer)
+                setAddress(address)
+                setIsAdmin(address.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS.toLowerCase())
 
-                    const tokenA = new ethers.Contract(contractAddresses.TokenA, TokenAJson.abi, signer)
-                    const nftB = new ethers.Contract(contractAddresses.NFTB, NFTBJson.abi, signer)
-                    const staking = new ethers.Contract(contractAddresses.Staking, StakingJson.abi, signer)
+                const tokenA = new ethers.Contract(contractAddresses.TokenA, TokenAJson.abi, signer)
+                const nftB = new ethers.Contract(contractAddresses.NFTB, NFTBJson.abi, signer)
+                const staking = new ethers.Contract(contractAddresses.Staking, StakingJson.abi, signer)
 
-                    setTokenAContract(tokenA)
-                    setNFTBContract(nftB)
-                    setStakingContract(staking)
+                setTokenAContract(tokenA)
+                setNFTBContract(nftB)
+                setStakingContract(staking)
 
-                    await updateBalances(address, tokenA, nftB)
-                    await updateBaseAPR(staking)
+                await updateBalances(address, tokenA, nftB)
+                await updateBaseAPR(staking)
 
-                    // Check network
-                    const network = await provider.getNetwork()
-                    if (network.chainId !== parseInt(import.meta.env.VITE_TESTNET_CHAIN_ID)) {
-                        toast.error('Please connect to Linea Sepolia Testnet')
-                    }
+                // Check network
+                const network = await provider.getNetwork()
+                if (network.chainId !== parseInt(import.meta.env.VITE_TESTNET_CHAIN_ID)) {
+                    toast.error('Please connect to Linea Sepolia Testnet')
                 }
             } catch (error) {
                 console.error('Error connecting wallet:', error)

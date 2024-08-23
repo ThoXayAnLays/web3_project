@@ -10,7 +10,7 @@ contract Staking is Ownable {
     TokenA public tokenA;
     NFTB public nftB;
 
-    uint256 public constant LOCK_PERIOD = 5 minutes;
+    uint256 public constant LOCK_PERIOD = 5 minutes; // Changed back to 5 minutes as per original contract
     uint256 public constant NFT_THRESHOLD = 1000000 * 10 ** 18;
     uint256 public baseAPR = 800; // 8% in basis points
     uint256 public nftBonusAPR = 200; // 2% in basis points
@@ -20,6 +20,8 @@ contract Staking is Ownable {
         uint256 timestamp;
         uint256 nftDepositTime;
         uint256 nftCount;
+        uint256 pendingReward;
+        uint256 lockEndTime; // New field to track lock end time
     }
 
     mapping(address => Stake) public stakes;
@@ -38,18 +40,23 @@ contract Staking is Ownable {
         nftB = NFTB(_nftB);
     }
 
-     function deposit(uint256 amount) external {
+    function deposit(uint256 amount) external {
         require(amount > 0, "Amount must be greater than 0");
         require(tokenA.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
         Stake storage stake = stakes[msg.sender];
         if (stake.amount > 0) {
             uint256 reward = calculateReward(msg.sender);
-            stake.amount += reward;
+            stake.pendingReward += reward;
         }
 
         stake.amount += amount;
         stake.timestamp = block.timestamp;
+        stake.lockEndTime = block.timestamp + LOCK_PERIOD; // Update lock end time
+
+        if (stake.nftDepositTime > 0) {
+            stake.nftDepositTime = block.timestamp;
+        }
 
         if (stake.amount >= NFT_THRESHOLD) {
             uint256 tokenId = nftB.safeMint(msg.sender);
@@ -59,29 +66,12 @@ contract Staking is Ownable {
         emit Deposited(msg.sender, amount);
     }
 
-    function depositNFT(uint256 tokenId) external {
-        require(nftB.ownerOf(tokenId) == msg.sender, "You don't own this NFT");
-        nftB.transferFrom(msg.sender, address(this), tokenId);
-
-        Stake storage stake = stakes[msg.sender];
-        if (stake.nftDepositTime == 0) {
-            stake.nftDepositTime = block.timestamp;
-        }
-        stake.nftCount++;
-        stakedNFTs[msg.sender].push(tokenId);
-
-        emit NFTDeposited(msg.sender, tokenId);
-    }
-
     function withdraw() external {
         Stake storage stake = stakes[msg.sender];
         require(stake.amount > 0, "No stake to withdraw");
-        require(
-            block.timestamp >= stake.timestamp + LOCK_PERIOD,
-            "Tokens are still locked"
-        );
+        require(block.timestamp >= stake.lockEndTime, "Tokens are still locked");
 
-        uint256 reward = calculateReward(msg.sender);
+        uint256 reward = calculateReward(msg.sender) + stake.pendingReward;
         uint256 totalAmount = stake.amount + reward;
 
         require(tokenA.transfer(msg.sender, totalAmount), "Transfer failed");
@@ -89,14 +79,28 @@ contract Staking is Ownable {
         emit Withdrawn(msg.sender, stake.amount, reward);
 
         delete stakes[msg.sender];
+        
+        uint256[] storage userNFTs = stakedNFTs[msg.sender];
+        for (uint256 i = 0; i < userNFTs.length; i++) {
+            nftB.transferFrom(address(this), msg.sender, userNFTs[i]);
+            emit NFTWithdrawn(msg.sender, userNFTs[i]);
+        }
+        delete stakedNFTs[msg.sender];
     }
+
+    function getRemainingLockTime(address user) public view returns (uint256) {
+        Stake storage stake = stakes[user];
+        if (stake.amount == 0 || block.timestamp >= stake.lockEndTime) return 0;
+        return stake.lockEndTime - block.timestamp;
+    }
+
 
     function withdrawNFTs() external {
         Stake storage stake = stakes[msg.sender];
         require(stake.nftCount > 0, "No NFTs to withdraw");
 
         uint256 reward = calculateReward(msg.sender);
-        require(tokenA.transfer(msg.sender, reward), "Reward transfer failed");
+        stake.pendingReward += reward;
 
         uint256[] storage userNFTs = stakedNFTs[msg.sender];
         for (uint256 i = 0; i < userNFTs.length; i++) {
@@ -114,7 +118,7 @@ contract Staking is Ownable {
     }
 
     function claimReward() external {
-        uint256 reward = calculateReward(msg.sender);
+        uint256 reward = calculateReward(msg.sender) + stakes[msg.sender].pendingReward;
         require(reward > 0, "No reward to claim");
 
         require(tokenA.transfer(msg.sender, reward), "Transfer failed");
@@ -124,6 +128,7 @@ contract Staking is Ownable {
         if (stake.nftDepositTime > 0) {
             stake.nftDepositTime = block.timestamp;
         }
+        stake.pendingReward = 0;
 
         emit RewardClaimed(msg.sender, reward);
     }
@@ -136,15 +141,19 @@ contract Staking is Ownable {
         uint256 reward;
 
         if (stake.nftDepositTime > 0) {
-            uint256 baseReward = (stake.amount *
-                baseAPR *
-                (stake.nftDepositTime - stake.timestamp)) / (365 days * 10000);
-            uint256 bonusReward = (stake.amount *
-                (baseAPR + nftBonusAPR * stake.nftCount) *
-                (block.timestamp - stake.nftDepositTime)) / (365 days * 10000);
+            uint256 baseReward = Math.mulDiv(
+                stake.amount * baseAPR * (stake.nftDepositTime - stake.timestamp),
+                1,
+                365 days * 10000
+            );
+            uint256 bonusReward = Math.mulDiv(
+                stake.amount * (baseAPR + nftBonusAPR * stake.nftCount) * (block.timestamp - stake.nftDepositTime),
+                1,
+                365 days * 10000
+            );
             reward = baseReward + bonusReward;
         } else {
-            reward = (stake.amount * baseAPR * duration) / (365 days * 10000);
+            reward = Math.mulDiv(stake.amount * baseAPR * duration, 1, 365 days * 10000);
         }
 
         return reward;

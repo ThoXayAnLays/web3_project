@@ -7,6 +7,9 @@ Mỗi khi user deposit NFT B thì APR sẽ tăng thêm 2% với mỗi NFT B đư
 ví dụ: reward = (Token A * 2% * (depositNFTBTime - depositTokenATime)) + ((Token A + Token B) * 10% *(claimRewardTime hoặc withdrawTime - deposit NFTBTime))
 User có thể withdraw khi token không bị lock (người dùng có 2 option là: chỉ claim reward hoặc withdraw + claim reward).
 Admin có quyền update % của base APR.
+
+
+
 Testnet: https://linea-sepolia.infura.io/v3/3c6c81e9dcee4001b676c3ddb43e9f20
 
 FE (sử dụng VITE):
@@ -52,5 +55,6 @@ BE (sử dụng nodejs, và mongoDB, using node-schedule not bullmq or kue) đ�
 BE use API folder structure.
 Crawl transaction event data trực tiếp từ smart contract: Deposit TokenA Event, Deposit NFTB Event, Withdraw Event, Claim Reward Event, Update APR Event (save both from address and to address). Sử dụng Kue scheduler để quản lý jobs, sử dụng cron jobs để bắt được event của smart contracts.
 Quản lý được jobs status, tối ưu jobs để không miss data, trùng lặp data.
+Ưu tiên crawl data khi user submit transaction để không miss data.
 Kết hợp paging, sort by event or time, search với FE.
 Khi FE call BE API, show transaction của user account. Show all transaction khi dùng admin account (account address matched address: 0x35C0184F55bb4e99EDFdC94e1067435991481Ea3)

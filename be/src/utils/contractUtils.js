@@ -35,7 +35,17 @@ async function getContractABIs() {
     return abis;
 }
 
+async function getDeploymentBlocks() {
+    // Replace these with the actual deployment block numbers
+    return {
+        tokenA: "3614880", // Example block number, replace with actual
+        nftB: "3614882", // Example block number, replace with actual
+        staking: "3614884", // Example block number, replace with actual
+    };
+}
+
 module.exports = {
     getContractAddresses,
     getContractABIs,
+    getDeploymentBlocks,
 };
