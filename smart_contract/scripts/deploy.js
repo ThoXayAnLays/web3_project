@@ -39,7 +39,7 @@ async function main() {
     console.log("Staking contract address: ", staking.address);
 
     // Save frontend files
-    console.log("Saving frontend files...");
+    console.log("Saving files to BE and FE...");
     saveFrontendFiles({
       TokenA: tokenA.address,
       NFTB: nftB.address,

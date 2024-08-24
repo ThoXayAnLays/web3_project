@@ -56,7 +56,7 @@ const UserDashboard = () => {
             const interval = setInterval(fetchRemainingLockTime, 60000); // Update every minute
             return () => clearInterval(interval);
         }
-    }, [address, stakingContract]);
+    }, [stakingContract]);
 
     const formatTime = (seconds) => {
         const days = Math.floor(seconds / (3600 * 24));
@@ -257,10 +257,58 @@ const UserDashboard = () => {
             return;
         }
 
-        await handleTransaction(
-            stakingContract.withdraw({ gasLimit: fixedGasLimit }),
-            "Withdrawal successful"
-        );
+        setLoading(true);
+        try {
+            // Check contract balance
+            const contractBalance = await stakingContract.getContractBalance();
+            const userStake = await stakingContract.stakes(address);
+            const reward = await stakingContract.calculateReward(address);
+            const totalWithdraw = userStake.amount
+                .add(userStake.pendingReward)
+                .add(reward);
+
+                console.log('Contract Balance:', ethers.utils.formatEther(contractBalance));
+                console.log('User Stake:', ethers.utils.formatEther(userStake.amount));
+                console.log('Pending Reward:', ethers.utils.formatEther(userStake.pendingReward));
+                console.log('Calculated Reward:', ethers.utils.formatEther(reward));
+                console.log('Total Withdraw:', ethers.utils.formatEther(totalWithdraw));
+
+            if (contractBalance.lt(totalWithdraw)) {
+                toast.error(
+                    "Contract has insufficient balance for withdrawal. Please contact the administrator."
+                );
+                console.error("Insufficient balance. Contract balance:", ethers.utils.formatEther(contractBalance), "Total withdraw:", ethers.utils.formatEther(totalWithdraw));
+                setLoading(false);
+                return;
+            }
+
+            const tx = await stakingContract.withdraw();
+            const receipt = await tx.wait();
+
+            if (receipt.status === 1) {
+                toast.success("Withdrawal successful");
+                // Update balances and other state...
+            } else {
+                toast.error("Withdrawal failed. Please try again.");
+            }
+        } catch (error) {
+            console.error("Withdrawal error:", error);
+            if (error.code === "ACTION_REJECTED") {
+                toast.error("Transaction was rejected by user");
+            } else if (error.data && error.data.message) {
+                const errorMessage = error.data.message.replace(
+                    "execution reverted: ",
+                    ""
+                );
+                toast.error(`Withdrawal failed: ${errorMessage}`);
+            } else if (error.message) {
+                toast.error(`Withdrawal failed: ${error.message}`);
+            } else {
+                toast.error("Withdrawal failed for an unknown reason");
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleWithdrawNFTs = () =>

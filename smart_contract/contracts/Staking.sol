@@ -66,15 +66,30 @@ contract Staking is Ownable {
         emit Deposited(msg.sender, amount);
     }
 
+    function depositNFT(uint256 tokenId) external {
+        require(nftB.ownerOf(tokenId) == msg.sender, "You don't own this NFT");
+        nftB.transferFrom(msg.sender, address(this), tokenId);
+
+        Stake storage stake = stakes[msg.sender];
+        if (stake.nftDepositTime == 0) {
+            stake.nftDepositTime = block.timestamp;
+        }
+        stake.nftCount++;
+        stakedNFTs[msg.sender].push(tokenId);
+
+        emit NFTDeposited(msg.sender, tokenId);
+    }
+
     function withdraw() external {
         Stake storage stake = stakes[msg.sender];
-        require(stake.amount > 0, "No stake to withdraw");
-        require(block.timestamp >= stake.lockEndTime, "Tokens are still locked");
+        require(stake.amount > 0, "Withdraw: No stake to withdraw");
+        require(block.timestamp >= stake.lockEndTime, "Withdraw: Tokens are still locked");
 
         uint256 reward = calculateReward(msg.sender) + stake.pendingReward;
         uint256 totalAmount = stake.amount + reward;
 
-        require(tokenA.transfer(msg.sender, totalAmount), "Transfer failed");
+        require(tokenA.balanceOf(address(this)) >= totalAmount, "Withdraw: Contract has insufficient balance");
+        require(tokenA.transfer(msg.sender, totalAmount), "Withdraw: Transfer failed");
 
         emit Withdrawn(msg.sender, stake.amount, reward);
 
@@ -86,6 +101,23 @@ contract Staking is Ownable {
             emit NFTWithdrawn(msg.sender, userNFTs[i]);
         }
         delete stakedNFTs[msg.sender];
+    }
+
+    function getStakeDetails(address user) public view returns (
+        uint256 stakedAmount,
+        uint256 pendingReward,
+        uint256 calculatedReward,
+        uint256 lockEndTime
+    ) {
+        Stake storage stake = stakes[user];
+        stakedAmount = stake.amount;
+        pendingReward = stake.pendingReward;
+        calculatedReward = calculateReward(user);
+        lockEndTime = stake.lockEndTime;
+    }
+
+    function getContractBalance() public view returns (uint256) {
+        return tokenA.balanceOf(address(this));
     }
 
     function getRemainingLockTime(address user) public view returns (uint256) {
@@ -146,11 +178,7 @@ contract Staking is Ownable {
                 1,
                 365 days * 10000
             );
-            uint256 bonusReward = Math.mulDiv(
-                stake.amount * (baseAPR + nftBonusAPR * stake.nftCount) * (block.timestamp - stake.nftDepositTime),
-                1,
-                365 days * 10000
-            );
+            uint256 bonusReward = Math.mulDiv(stake.amount * (baseAPR + nftBonusAPR * stake.nftCount) * (block.timestamp - stake.nftDepositTime),1,365 days * 10000);
             reward = baseReward + bonusReward;
         } else {
             reward = Math.mulDiv(stake.amount * baseAPR * duration, 1, 365 days * 10000);
