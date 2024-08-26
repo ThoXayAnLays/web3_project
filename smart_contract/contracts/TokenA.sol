@@ -7,9 +7,23 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract TokenA is ERC20, Ownable {
     uint256 public constant TOTAL_SUPPLY = 1000000000 * 10**18;
     uint256 public constant MAX_FAUCET_AMOUNT = 5000000 * 10**18; // 5000000 tokens
+    uint256 public constant MAX_REWARD_AMOUNT = 1000000 * 10**18; 
+    address public stakingContract;
 
     constructor() ERC20("Token A", "TKA") Ownable(msg.sender) {
         _mint(address(this), TOTAL_SUPPLY);
+    }
+
+    function setStakingContract(address _stakingContract) external onlyOwner {
+        stakingContract = _stakingContract;
+    }
+
+    function transferReward(address to, uint256 amount) external returns (bool) {
+        require(amount <= MAX_REWARD_AMOUNT, "Staking: Amount exceeds maximum allowed");
+        require(balanceOf(address(this)) >= amount, "Faucet: Insufficient balance in contract");
+        require(msg.sender == stakingContract, "Only staking contract can transferReward");
+        _transfer(address(this), to, amount);
+        return true;
     }
 
     function faucet(uint256 amount) public {

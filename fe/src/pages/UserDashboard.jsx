@@ -34,6 +34,7 @@ const UserDashboard = () => {
     const [stakedAmount, setStakedAmount] = useState("0");
     const [reward, setReward] = useState("0");
     const [remainingLockTime, setRemainingLockTime] = useState(0);
+    const [mintedNFTCount, setMintedNFTCount] = useState(0);
 
     const fixedGasLimit = 900000;
 
@@ -56,7 +57,15 @@ const UserDashboard = () => {
             const interval = setInterval(fetchRemainingLockTime, 60000); // Update every minute
             return () => clearInterval(interval);
         }
-    }, [stakingContract]);
+
+        const fetchMintedNFTCount = async () => {
+            if (stakingContract && address) {
+                const stake = await stakingContract.stakes(address);
+                setMintedNFTCount(stake.mintedNFTCount.toNumber());
+            }
+        };
+        fetchMintedNFTCount();
+    }, [stakingContract, address]);
 
     const formatTime = (seconds) => {
         const days = Math.floor(seconds / (3600 * 24));
@@ -158,6 +167,7 @@ const UserDashboard = () => {
                 fetchReward();
                 fetchOwnedNFTs();
                 fetchStakedNFTs();
+                fetchRemainingLockTime();
             } else {
                 toast.error("Transaction failed. Please try again.");
             }
@@ -184,7 +194,7 @@ const UserDashboard = () => {
                     );
                 }
             } else {
-                toast.error(`Transaction failed: ${error.message}`);
+                toast.error("Transaction failed. Please try again.");
             }
         } finally {
             setLoading(false);
@@ -257,60 +267,11 @@ const UserDashboard = () => {
             return;
         }
 
-        setLoading(true);
-        try {
-            // Check contract balance
-            const contractBalance = await stakingContract.getContractBalance();
-            const userStake = await stakingContract.stakes(address);
-            const reward = await stakingContract.calculateReward(address);
-            const totalWithdraw = userStake.amount
-                .add(userStake.pendingReward)
-                .add(reward);
-
-                console.log('Contract Balance:', ethers.utils.formatEther(contractBalance));
-                console.log('User Stake:', ethers.utils.formatEther(userStake.amount));
-                console.log('Pending Reward:', ethers.utils.formatEther(userStake.pendingReward));
-                console.log('Calculated Reward:', ethers.utils.formatEther(reward));
-                console.log('Total Withdraw:', ethers.utils.formatEther(totalWithdraw));
-
-            if (contractBalance.lt(totalWithdraw)) {
-                toast.error(
-                    "Contract has insufficient balance for withdrawal. Please contact the administrator."
-                );
-                console.error("Insufficient balance. Contract balance:", ethers.utils.formatEther(contractBalance), "Total withdraw:", ethers.utils.formatEther(totalWithdraw));
-                setLoading(false);
-                return;
-            }
-
-            const tx = await stakingContract.withdraw();
-            const receipt = await tx.wait();
-
-            if (receipt.status === 1) {
-                toast.success("Withdrawal successful");
-                // Update balances and other state...
-            } else {
-                toast.error("Withdrawal failed. Please try again.");
-            }
-        } catch (error) {
-            console.error("Withdrawal error:", error);
-            if (error.code === "ACTION_REJECTED") {
-                toast.error("Transaction was rejected by user");
-            } else if (error.data && error.data.message) {
-                const errorMessage = error.data.message.replace(
-                    "execution reverted: ",
-                    ""
-                );
-                toast.error(`Withdrawal failed: ${errorMessage}`);
-            } else if (error.message) {
-                toast.error(`Withdrawal failed: ${error.message}`);
-            } else {
-                toast.error("Withdrawal failed for an unknown reason");
-            }
-        } finally {
-            setLoading(false);
-        }
+        await handleTransaction(
+            stakingContract.withdraw({ gasLimit: fixedGasLimit }),
+            "Withdrawal successful"
+        );
     };
-
     const handleWithdrawNFTs = () =>
         handleTransaction(
             stakingContract.withdrawNFTs({ gasLimit: fixedGasLimit }),
@@ -325,10 +286,10 @@ const UserDashboard = () => {
 
     const handleGetTokenA = () =>
         handleTransaction(
-            tokenAContract.faucet(ethers.utils.parseEther("1000000"), {
+            tokenAContract.faucet(ethers.utils.parseEther("2000000"), {
                 gasLimit: fixedGasLimit,
             }),
-            "Received 1,000,000 TokenA"
+            "Received 2,000,000 TokenA"
         );
 
     return (
@@ -417,7 +378,7 @@ const UserDashboard = () => {
                     onClick={handleGetTokenA}
                     disabled={loading}
                 >
-                    Faucet 1M TokenA
+                    Faucet 2M TokenA
                 </Button>
                 <div>
                     <Typography variant="h6" gutterBottom>

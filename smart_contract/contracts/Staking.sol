@@ -10,10 +10,10 @@ contract Staking is Ownable {
     TokenA public tokenA;
     NFTB public nftB;
 
-    uint256 public constant LOCK_PERIOD = 5 minutes; // Changed back to 5 minutes as per original contract
+    uint256 public constant LOCK_PERIOD = 30 seconds;
     uint256 public constant NFT_THRESHOLD = 1000000 * 10 ** 18;
-    uint256 public baseAPR = 800; // 8% in basis points
-    uint256 public nftBonusAPR = 200; // 2% in basis points
+    uint256 public baseAPR = 800;
+    uint256 public nftBonusAPR = 200;
 
     struct Stake {
         uint256 amount;
@@ -21,11 +21,14 @@ contract Staking is Ownable {
         uint256 nftDepositTime;
         uint256 nftCount;
         uint256 pendingReward;
-        uint256 lockEndTime; // New field to track lock end time
+        uint256 lockEndTime;
+        uint256 mintedNFTCount;
+        uint256 totalStakedAmount;
     }
 
     mapping(address => Stake) public stakes;
     mapping(address => uint256[]) public stakedNFTs;
+    mapping(address => uint256) public mintedNFTs;
 
     event Deposited(address indexed user, uint256 amount);
     event NFTDeposited(address indexed user, uint256 tokenId);
@@ -42,7 +45,10 @@ contract Staking is Ownable {
 
     function deposit(uint256 amount) external {
         require(amount > 0, "Amount must be greater than 0");
-        require(tokenA.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        require(
+            tokenA.transferFrom(msg.sender, address(this), amount),
+            "Transfer failed"
+        );
 
         Stake storage stake = stakes[msg.sender];
         if (stake.amount > 0) {
@@ -51,17 +57,22 @@ contract Staking is Ownable {
         }
 
         stake.amount += amount;
+        stake.totalStakedAmount += amount;
         stake.timestamp = block.timestamp;
-        stake.lockEndTime = block.timestamp + LOCK_PERIOD; // Update lock end time
+        stake.lockEndTime = block.timestamp + LOCK_PERIOD;
 
         if (stake.nftDepositTime > 0) {
             stake.nftDepositTime = block.timestamp;
         }
 
-        if (stake.amount >= NFT_THRESHOLD) {
+        uint256 nftsToMint = stake.totalStakedAmount /
+            NFT_THRESHOLD -
+            mintedNFTs[msg.sender];
+        for (uint256 i = 0; i < nftsToMint; i++) {
             uint256 tokenId = nftB.safeMint(msg.sender);
             emit NFTMinted(msg.sender, tokenId);
         }
+        mintedNFTs[msg.sender] += nftsToMint;
 
         emit Deposited(msg.sender, amount);
     }
@@ -71,44 +82,71 @@ contract Staking is Ownable {
         nftB.transferFrom(msg.sender, address(this), tokenId);
 
         Stake storage stake = stakes[msg.sender];
+
+        if (stake.amount > 0) {
+            uint256 reward = calculateReward(msg.sender);
+            stake.pendingReward += reward;
+        }
+
         if (stake.nftDepositTime == 0) {
+            stake.nftDepositTime = block.timestamp;
+        } else {
             stake.nftDepositTime = block.timestamp;
         }
         stake.nftCount++;
         stakedNFTs[msg.sender].push(tokenId);
+
+        stake.timestamp = block.timestamp;
 
         emit NFTDeposited(msg.sender, tokenId);
     }
 
     function withdraw() external {
         Stake storage stake = stakes[msg.sender];
-        require(stake.amount > 0, "Withdraw: No stake to withdraw");
-        require(block.timestamp >= stake.lockEndTime, "Withdraw: Tokens are still locked");
+        require(stake.amount > 0, "No stake to withdraw");
+        require(
+            block.timestamp >= stake.lockEndTime,
+            "Tokens are still locked"
+        );
 
         uint256 reward = calculateReward(msg.sender) + stake.pendingReward;
         uint256 totalAmount = stake.amount + reward;
 
-        require(tokenA.balanceOf(address(this)) >= totalAmount, "Withdraw: Contract has insufficient balance");
-        require(tokenA.transfer(msg.sender, totalAmount), "Withdraw: Transfer failed");
+        require(
+            tokenA.transfer(msg.sender, stake.amount),
+            "Staked amount transfer failed"
+        );
+        require(
+            tokenA.transferReward(msg.sender, reward),
+            "Reward transfer failed"
+        );
+
+        // Handle NFTs
+        for (uint256 i = 0; i < stakedNFTs[msg.sender].length; i++) {
+            uint256 tokenId = stakedNFTs[msg.sender][i];
+            nftB.transferFrom(address(this), msg.sender, tokenId);
+            emit NFTWithdrawn(msg.sender, tokenId);
+        }
 
         emit Withdrawn(msg.sender, stake.amount, reward);
 
-        delete stakes[msg.sender];
-        
-        uint256[] storage userNFTs = stakedNFTs[msg.sender];
-        for (uint256 i = 0; i < userNFTs.length; i++) {
-            nftB.transferFrom(address(this), msg.sender, userNFTs[i]);
-            emit NFTWithdrawn(msg.sender, userNFTs[i]);
-        }
+        // Clear stake data
         delete stakedNFTs[msg.sender];
+        delete stakes[msg.sender];
     }
 
-    function getStakeDetails(address user) public view returns (
-        uint256 stakedAmount,
-        uint256 pendingReward,
-        uint256 calculatedReward,
-        uint256 lockEndTime
-    ) {
+    function getStakeDetails(
+        address user
+    )
+        public
+        view
+        returns (
+            uint256 stakedAmount,
+            uint256 pendingReward,
+            uint256 calculatedReward,
+            uint256 lockEndTime
+        )
+    {
         Stake storage stake = stakes[user];
         stakedAmount = stake.amount;
         pendingReward = stake.pendingReward;
@@ -126,41 +164,66 @@ contract Staking is Ownable {
         return stake.lockEndTime - block.timestamp;
     }
 
-
-    function withdrawNFTs() external {
+    function withdrawNFTs(uint256[] calldata tokenIds) external {
         Stake storage stake = stakes[msg.sender];
         require(stake.nftCount > 0, "No NFTs to withdraw");
+        require(tokenIds.length > 0, "No NFTs selected for withdrawal");
+        require(
+            tokenIds.length <= stake.nftCount,
+            "Attempting to withdraw more NFTs than staked"
+        );
 
         uint256 reward = calculateReward(msg.sender);
         stake.pendingReward += reward;
+        stake.timestamp = block.timestamp;
 
-        uint256[] storage userNFTs = stakedNFTs[msg.sender];
-        for (uint256 i = 0; i < userNFTs.length; i++) {
-            nftB.transferFrom(address(this), msg.sender, userNFTs[i]);
-            emit NFTWithdrawn(msg.sender, userNFTs[i]);
+        uint256 withdrawnCount = 0;
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+            bool found = false;
+            for (uint256 j = 0; j < stakedNFTs[msg.sender].length; j++) {
+                if (stakedNFTs[msg.sender][j] == tokenId) {
+                    nftB.transferFrom(address(this), msg.sender, tokenId);
+                    stakedNFTs[msg.sender][j] = stakedNFTs[msg.sender][
+                        stakedNFTs[msg.sender].length - 1
+                    ];
+                    stakedNFTs[msg.sender].pop();
+                    emit NFTWithdrawn(msg.sender, tokenId);
+                    withdrawnCount++;
+                    found = true;
+                    break;
+                }
+            }
+            require(found, "NFT not found in staked NFTs");
         }
 
-        stake.nftCount = 0;
-        stake.nftDepositTime = 0;
-        delete stakedNFTs[msg.sender];
+        stake.nftCount -= withdrawnCount;
 
-        stake.timestamp = block.timestamp;
+        // Recalculate APR based on remaining staked NFTs
+        if (stake.nftDepositTime > 0) {
+            stake.nftDepositTime = block.timestamp;
+        }
 
         emit RewardClaimed(msg.sender, reward);
     }
 
     function claimReward() external {
-        uint256 reward = calculateReward(msg.sender) + stakes[msg.sender].pendingReward;
+        Stake storage stake = stakes[msg.sender];
+        require(stake.amount > 0, "No stake to claim reward from");
+
+        uint256 reward = calculateReward(msg.sender) + stake.pendingReward;
         require(reward > 0, "No reward to claim");
 
-        require(tokenA.transfer(msg.sender, reward), "Transfer failed");
+        require(
+            tokenA.transferReward(msg.sender, reward),
+            "Reward transfer failed"
+        );
 
-        Stake storage stake = stakes[msg.sender];
+        stake.pendingReward = 0;
         stake.timestamp = block.timestamp;
         if (stake.nftDepositTime > 0) {
             stake.nftDepositTime = block.timestamp;
         }
-        stake.pendingReward = 0;
 
         emit RewardClaimed(msg.sender, reward);
     }
@@ -174,14 +237,26 @@ contract Staking is Ownable {
 
         if (stake.nftDepositTime > 0) {
             uint256 baseReward = Math.mulDiv(
-                stake.amount * baseAPR * (stake.nftDepositTime - stake.timestamp),
+                stake.amount *
+                    baseAPR *
+                    (stake.nftDepositTime - stake.timestamp),
                 1,
                 365 days * 10000
             );
-            uint256 bonusReward = Math.mulDiv(stake.amount * (baseAPR + nftBonusAPR * stake.nftCount) * (block.timestamp - stake.nftDepositTime),1,365 days * 10000);
+            uint256 bonusReward = Math.mulDiv(
+                stake.amount *
+                    (baseAPR + nftBonusAPR * stake.nftCount) *
+                    (block.timestamp - stake.nftDepositTime),
+                1,
+                365 days * 10000
+            );
             reward = baseReward + bonusReward;
         } else {
-            reward = Math.mulDiv(stake.amount * baseAPR * duration, 1, 365 days * 10000);
+            reward = Math.mulDiv(
+                stake.amount * baseAPR * duration,
+                1,
+                365 days * 10000
+            );
         }
 
         return reward;
@@ -199,5 +274,13 @@ contract Staking is Ownable {
     function updateBaseAPR(uint256 newBaseAPR) external onlyOwner {
         baseAPR = newBaseAPR;
         emit APRUpdated(newBaseAPR);
+    }
+
+    function getMintedNFTCount(address user) external view returns (uint256) {
+        return mintedNFTs[user];
+    }
+
+    function getStakedNFTCount(address user) external view returns (uint256) {
+        return stakes[user].nftCount;
     }
 }

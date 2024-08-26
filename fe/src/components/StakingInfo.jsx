@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react'
-import { useWeb3 } from '../contexts/Web3Context'
-import { ethers } from 'ethers'
-import { Card, CardContent, Typography, CircularProgress } from '@mui/material'
+import React, { useState, useEffect } from "react";
+import { useWeb3 } from "../contexts/Web3Context";
+import { ethers } from "ethers";
+import { Card, CardContent, Typography, CircularProgress } from "@mui/material";
 
 const StakingInfo = () => {
-    const { address, stakingContract } = useWeb3()
-    const [stakingInfo, setStakingInfo] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [remainingLockTime, setRemainingLockTime] = useState(0)
-    const [contractBalance, setContractBalance] = useState('0')
+    const { address, stakingContract, tokenAContract } = useWeb3();
+    const [stakingInfo, setStakingInfo] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [remainingLockTime, setRemainingLockTime] = useState(0);
 
     useEffect(() => {
         let intervalId;
@@ -16,27 +15,34 @@ const StakingInfo = () => {
         const fetchStakingInfo = async () => {
             if (stakingContract && address) {
                 try {
-                    const [stakedAmount, pendingReward, calculatedReward, lockEndTime] = await stakingContract.getStakeDetails(address)
-                    const APR = await stakingContract.getCurrentAPR(address)
-                    const currentAPR = (APR.toNumber() / 100)
-                    const balance = await stakingContract.getContractBalance()
+                    const stake = await stakingContract.stakes(address);
+                    const baseAPR = await stakingContract.baseAPR();
+                    const nftBonusAPR = await stakingContract.nftBonusAPR();
+                    const reward = await stakingContract.calculateReward(
+                        address
+                    );
+                    const effectiveAPR = baseAPR.add(
+                        nftBonusAPR.mul(stake.nftCount)
+                    );
+                    const lockTime = await stakingContract.getRemainingLockTime(
+                        address
+                    );
 
                     setStakingInfo({
-                        stakedAmount: ethers.utils.formatEther(stakedAmount),
-                        pendingReward: ethers.utils.formatEther(pendingReward),
-                        calculatedReward: ethers.utils.formatEther(calculatedReward),
-                        currentAPR: currentAPR.toString(),
-                    })
-                    setContractBalance(ethers.utils.formatEther(balance))
-                    
-                    const currentTime = Math.floor(Date.now() / 1000)
-                    const remainingTime = Math.max(0, lockEndTime.toNumber() - currentTime)
-                    setRemainingLockTime(remainingTime)
+                        stakedAmount: ethers.utils.formatEther(stake.amount),
+                        nftCount: stake.nftCount.toString(),
+                        effectiveAPR: effectiveAPR.toNumber() / 100, // Convert basis points to percentage
+                        reward: ethers.utils.formatEther(reward),
+                        pendingReward: ethers.utils.formatEther(
+                            stake.pendingReward
+                        ),
+                    });
+                    setRemainingLockTime(lockTime.toNumber());
 
                     // Start the countdown timer
                     clearInterval(intervalId);
                     intervalId = setInterval(() => {
-                        setRemainingLockTime(prevTime => {
+                        setRemainingLockTime((prevTime) => {
                             if (prevTime <= 0) {
                                 clearInterval(intervalId);
                                 return 0;
@@ -44,48 +50,61 @@ const StakingInfo = () => {
                             return prevTime - 1;
                         });
                     }, 1000);
-
                 } catch (error) {
-                    console.error('Error fetching staking info:', error)
+                    console.error("Error fetching staking info:", error);
                 } finally {
-                    setLoading(false)
+                    setLoading(false);
                 }
             }
-        }
+        };
 
-        fetchStakingInfo()
-        const fetchInterval = setInterval(fetchStakingInfo, 30000) // Refresh staking info every 30 seconds
+        fetchStakingInfo();
+        const fetchInterval = setInterval(fetchStakingInfo, 30000); // Refresh staking info every 30 seconds
 
         return () => {
-            clearInterval(fetchInterval)
-            clearInterval(intervalId)
-        }
-    }, [stakingContract, address])
+            clearInterval(fetchInterval);
+            clearInterval(intervalId);
+        };
+    }, [stakingContract, address, tokenAContract]);
 
     const formatTime = (seconds) => {
-        if (seconds <= 0) return 'Unlocked'
-        const minutes = Math.floor(seconds / 60)
-        const remainingSeconds = seconds % 60
-        return `${minutes}m ${remainingSeconds.toString().padStart(2, '0')}s`
-    }
+        if (seconds <= 0) return "Unlocked";
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}m ${remainingSeconds.toString().padStart(2, "0")}s`;
+    };
 
     if (loading) {
-        return <CircularProgress />
+        return <CircularProgress />;
     }
 
     return (
         <Card>
             <CardContent>
-                <Typography variant="h5" component="div">Staking Information</Typography>
-                <Typography>Staked Amount: {stakingInfo?.stakedAmount || '0'} TokenA</Typography>
-                <Typography>Pending Reward: {stakingInfo?.pendingReward || '0'} TokenA</Typography>
-                <Typography>Calculated Reward: {stakingInfo?.calculatedReward || '0'} TokenA</Typography>
-                <Typography>Current APR: {stakingInfo?.currentAPR || '0'}%</Typography>
-                <Typography>Lock Time: {formatTime(remainingLockTime)}</Typography>
-                <Typography>Contract Balance: {contractBalance} TokenA</Typography>
+                <Typography variant="h5" component="div">
+                    Staking Information
+                </Typography>
+                <Typography>
+                    Staked Amount: {stakingInfo?.stakedAmount || "0"} TokenA
+                </Typography>
+                <Typography>
+                    Staked NFTs: {stakingInfo?.nftCount || "0"}
+                </Typography>
+                <Typography>
+                    Effective APR: {stakingInfo?.effectiveAPR || "0"}%
+                </Typography>
+                <Typography>
+                    Pending Reward: {stakingInfo?.pendingReward || "0"} TokenA
+                </Typography>
+                <Typography>
+                    Calculated Reward: {stakingInfo?.reward || "0"} TokenA
+                </Typography>
+                <Typography>
+                    Lock Time: {formatTime(remainingLockTime)}
+                </Typography>
             </CardContent>
         </Card>
-    )
-}
+    );
+};
 
-export default StakingInfo
+export default StakingInfo;

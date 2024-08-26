@@ -38,6 +38,9 @@ async function main() {
     await staking.deployed();
     console.log("Staking contract address: ", staking.address);
 
+    await tokenA.setStakingContract(staking.address);
+    console.log("Staking contract set in TokenA");
+
     // Save frontend files
     console.log("Saving files to BE and FE...");
     saveFrontendFiles({
