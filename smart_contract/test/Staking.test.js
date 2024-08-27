@@ -27,14 +27,14 @@ describe("Staking Contract", function () {
         await tokenA.setStakingContract(staking.address);
 
         // Give some tokens to users for testing
-        await tokenA.faucet(ethers.utils.parseEther("2000000"));
+        await tokenA.faucet(ethers.utils.parseEther("5000000"));
         await tokenA.transfer(
             user1.address,
-            ethers.utils.parseEther("1000000")
+            ethers.utils.parseEther("2000000")
         );
         await tokenA.transfer(
             user2.address,
-            ethers.utils.parseEther("1000000")
+            ethers.utils.parseEther("2000000")
         );
     });
 
@@ -168,6 +168,195 @@ describe("Staking Contract", function () {
 
             const currentAPR = await staking.getCurrentAPR(user1.address);
             expect(currentAPR).to.equal(newBaseAPR);
+        });
+    });
+
+    describe("Complex Staking Scenarios", function () {
+        it("Should calculate correct reward after multiple deposits", async function () {
+            const initialDeposit = ethers.utils.parseEther("500000");
+            const additionalDeposit = ethers.utils.parseEther("300000");
+
+            await tokenA
+                .connect(user1)
+                .approve(
+                    staking.address,
+                    initialDeposit.add(additionalDeposit)
+                );
+            await staking.connect(user1).deposit(initialDeposit);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            await staking.connect(user1).deposit(additionalDeposit);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            const stake = await staking.stakes(user1.address);
+            const calculatedReward = await staking.calculateReward(
+                user1.address
+            );
+            const totalReward = stake.pendingReward.add(calculatedReward);
+
+            const rewardDay1 = initialDeposit
+                .mul(BASE_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const rewardDay2 = initialDeposit
+                .add(additionalDeposit)
+                .mul(BASE_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const expectedReward = rewardDay1.add(rewardDay2);
+
+            expect(totalReward).to.be.closeTo(
+                expectedReward,
+                ethers.utils.parseEther("0.1")
+            );
+        });
+
+        it("Should calculate correct reward after depositing multiple NFTs", async function () {
+            const depositAmount = ethers.utils.parseEther("1000000");
+            await tokenA.connect(user1).approve(staking.address, depositAmount);
+            await staking.connect(user1).deposit(depositAmount);
+
+            await nftB.safeMint(user1.address);
+            const tokenId1 = 0;
+            await nftB.connect(user1).approve(staking.address, tokenId1);
+            await staking.connect(user1).depositNFT(tokenId1);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            await nftB.safeMint(user1.address);
+            const tokenId2 = 1;
+            await nftB.connect(user1).approve(staking.address, tokenId2);
+            await staking.connect(user1).depositNFT(tokenId2);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            const stake = await staking.stakes(user1.address);
+            const calculatedReward = await staking.calculateReward(
+                user1.address
+            );
+            const totalReward = stake.pendingReward.add(calculatedReward);
+
+            const rewardDay1 = depositAmount
+                .mul(BASE_APR + NFT_BONUS_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const rewardDay2 = depositAmount
+                .mul(BASE_APR + 2 * NFT_BONUS_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const expectedReward = rewardDay1.add(rewardDay2);
+
+            expect(totalReward).to.be.closeTo(
+                expectedReward,
+                ethers.utils.parseEther("0.1")
+            );
+        });
+
+        it("Should calculate correct reward after withdrawing NFTs", async function () {
+            const depositAmount = ethers.utils.parseEther("1000000");
+            await tokenA.connect(user1).approve(staking.address, depositAmount);
+            await staking.connect(user1).deposit(depositAmount);
+
+            await nftB.safeMint(user1.address);
+            await nftB.safeMint(user1.address);
+            const tokenId1 = 0;
+            const tokenId2 = 1;
+            await nftB.connect(user1).approve(staking.address, tokenId1);
+            await nftB.connect(user1).approve(staking.address, tokenId2);
+            await staking.connect(user1).depositNFT(tokenId1);
+            await staking.connect(user1).depositNFT(tokenId2);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            await staking.connect(user1).withdrawNFTs([tokenId1]);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            const stake = await staking.stakes(user1.address);
+            const calculatedReward = await staking.calculateReward(
+                user1.address
+            );
+            const totalReward = stake.pendingReward.add(calculatedReward);
+
+            const rewardDay1 = depositAmount
+                .mul(BASE_APR + 2 * NFT_BONUS_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const rewardDay2 = depositAmount
+                .mul(BASE_APR + NFT_BONUS_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const expectedReward = rewardDay1.add(rewardDay2);
+
+            expect(totalReward).to.be.closeTo(
+                expectedReward,
+                ethers.utils.parseEther("0.1")
+            );
+            expect(stake.nftCount).to.equal(1);
+        });
+
+        it("Should handle reward calculation correctly when depositing tokens after NFTs", async function () {
+            const initialDeposit = ethers.utils.parseEther("500000");
+            const additionalDeposit = ethers.utils.parseEther("300000");
+
+            await tokenA
+                .connect(user1)
+                .approve(
+                    staking.address,
+                    initialDeposit.add(additionalDeposit)
+                );
+            await staking.connect(user1).deposit(initialDeposit);
+
+            await nftB.safeMint(user1.address);
+            const tokenId = 0;
+            await nftB.connect(user1).approve(staking.address, tokenId);
+            await staking.connect(user1).depositNFT(tokenId);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            await staking.connect(user1).deposit(additionalDeposit);
+
+            await ethers.provider.send("evm_increaseTime", [86400]);
+            await ethers.provider.send("evm_mine");
+
+            const stake = await staking.stakes(user1.address);
+            const calculatedReward = await staking.calculateReward(
+                user1.address
+            );
+            const totalReward = stake.pendingReward.add(calculatedReward);
+
+            const rewardDay1 = initialDeposit
+                .mul(BASE_APR + NFT_BONUS_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const rewardDay2 = initialDeposit
+                .add(additionalDeposit)
+                .mul(BASE_APR + NFT_BONUS_APR)
+                .mul(86400)
+                .div(365 * 24 * 3600)
+                .div(10000);
+            const expectedReward = rewardDay1.add(rewardDay2);
+
+            expect(totalReward).to.be.closeTo(
+                expectedReward,
+                ethers.utils.parseEther("0.1")
+            );
         });
     });
 });

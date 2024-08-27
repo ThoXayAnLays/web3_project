@@ -88,11 +88,8 @@ contract Staking is Ownable {
             stake.pendingReward += reward;
         }
 
-        if (stake.nftDepositTime == 0) {
-            stake.nftDepositTime = block.timestamp;
-        } else {
-            stake.nftDepositTime = block.timestamp;
-        }
+        stake.nftDepositTime = block.timestamp;
+
         stake.nftCount++;
         stakedNFTs[msg.sender].push(tokenId);
 
