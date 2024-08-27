@@ -9,7 +9,7 @@ contract NFTB is ERC721 {
     constructor() ERC721("NFT B", "NFTB") {}
 
     function safeMint(address to) public returns (uint256) {
-        uint256 tokenId = uint256(keccak256(abi.encodePacked(block.timestamp, to, _tokenIdCounter)));
+        uint256 tokenId =  _tokenIdCounter;
         _safeMint(to, tokenId);
         _tokenIdCounter++;
         return tokenId;

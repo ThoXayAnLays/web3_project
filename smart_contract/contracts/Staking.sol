@@ -110,7 +110,6 @@ contract Staking is Ownable {
         );
 
         uint256 reward = calculateReward(msg.sender) + stake.pendingReward;
-        uint256 totalAmount = stake.amount + reward;
 
         require(
             tokenA.transfer(msg.sender, stake.amount),
@@ -121,7 +120,6 @@ contract Staking is Ownable {
             "Reward transfer failed"
         );
 
-        // Handle NFTs
         for (uint256 i = 0; i < stakedNFTs[msg.sender].length; i++) {
             uint256 tokenId = stakedNFTs[msg.sender][i];
             nftB.transferFrom(address(this), msg.sender, tokenId);
@@ -130,7 +128,6 @@ contract Staking is Ownable {
 
         emit Withdrawn(msg.sender, stake.amount, reward);
 
-        // Clear stake data
         delete stakedNFTs[msg.sender];
         delete stakes[msg.sender];
     }
@@ -199,7 +196,6 @@ contract Staking is Ownable {
 
         stake.nftCount -= withdrawnCount;
 
-        // Recalculate APR based on remaining staked NFTs
         if (stake.nftDepositTime > 0) {
             stake.nftDepositTime = block.timestamp;
         }

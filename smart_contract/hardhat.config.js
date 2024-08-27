@@ -18,16 +18,14 @@ module.exports = {
     ]
   },
   networks:{
-    bscTestnet: {
-      url: "https://bsc-testnet-rpc.publicnode.com",
-      chainId: 97,
-      accounts: [process.env.PRIVATE_KEY],
-      gasPrice: 20000000000,
-      timeout: 60000 // 60 seconds
-    },
     lineaSepolia: {
       url: `https://linea-sepolia.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
+    bscTest: {
+      url: `https://bsc-testnet-rpc.publicnode.com`,
+      accounts: [`0x${process.env.PRIVATE_KEY}`],
+      chainId: 97,
+    }
   }
 };

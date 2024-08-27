@@ -8,6 +8,7 @@ exports.getUserTransactions = async (req, res) => {
             limit = 10,
             sortBy = "timestamp",
             sortOrder = "desc",
+            search = "",
         } = req.query;
 
         const options = {
@@ -16,13 +17,28 @@ exports.getUserTransactions = async (req, res) => {
             sort: { [sortBy]: sortOrder === "desc" ? -1 : 1 },
         };
 
-        const transactions = await Transaction.paginate(
-            { $or: [{ fromAddress: address }, { toAddress: address }] },
-            options
-        );
+        const searchQuery = search
+            ? {
+                  $or: [
+                      { fromAddress: { $regex: search, $options: "i" } },
+                      { toAddress: { $regex: search, $options: "i" } },
+                      { eventType: { $regex: search, $options: "i" } },
+                  ],
+              }
+            : {};
+
+        const query = {
+            $and: [
+                { $or: [{ fromAddress: address }, { toAddress: address }] },
+                searchQuery,
+            ],
+        };
+
+        const transactions = await Transaction.paginate(query, options);
 
         res.json(transactions);
     } catch (error) {
+        console.error("Error fetching user transactions:", error);
         res.status(500).json({
             message: "Error fetching user transactions",
             error: error.message,
@@ -37,6 +53,7 @@ exports.getAllTransactions = async (req, res) => {
             limit = 10,
             sortBy = "timestamp",
             sortOrder = "desc",
+            search = "",
         } = req.query;
 
         const options = {
@@ -45,47 +62,23 @@ exports.getAllTransactions = async (req, res) => {
             sort: { [sortBy]: sortOrder === "desc" ? -1 : 1 },
         };
 
-        const transactions = await Transaction.paginate({}, options);
-
-        res.json(transactions);
-    } catch (error) {
-        res.status(500).json({
-            message: "Error fetching all transactions",
-            error: error.message,
-        });
-    }
-};
-
-exports.searchTransactions = async (req, res) => {
-    try {
-        const {
-            query,
-            page = 1,
-            limit = 10,
-            sortBy = "timestamp",
-            sortOrder = "desc",
-        } = req.query;
-
-        const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { [sortBy]: sortOrder === "desc" ? -1 : 1 },
-        };
-
-        const searchQuery = {
-            $or: [
-                { fromAddress: { $regex: query, $options: "i" } },
-                { toAddress: { $regex: query, $options: "i" } },
-                { eventType: { $regex: query, $options: "i" } },
-            ],
-        };
+        const searchQuery = search
+            ? {
+                  $or: [
+                      { fromAddress: { $regex: search, $options: "i" } },
+                      { toAddress: { $regex: search, $options: "i" } },
+                      { eventType: { $regex: search, $options: "i" } },
+                  ],
+              }
+            : {};
 
         const transactions = await Transaction.paginate(searchQuery, options);
 
         res.json(transactions);
     } catch (error) {
+        console.error("Error fetching all transactions:", error);
         res.status(500).json({
-            message: "Error searching transactions",
+            message: "Error fetching all transactions",
             error: error.message,
         });
     }

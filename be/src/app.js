@@ -10,7 +10,9 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+    allowedHeaders: ['Content-Type', 'X-User-Address']
+}));
 app.use(express.json());
 
 // Connect to MongoDB

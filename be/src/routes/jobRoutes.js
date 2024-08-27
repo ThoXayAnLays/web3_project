@@ -3,7 +3,7 @@ const router = express.Router();
 const jobController = require("../controllers/jobController");
 const { isAdmin } = require("../middleware/authMiddleware");
 
-router.get("/status", isAdmin, jobController.getJobStatus);
-router.post("/run", isAdmin, jobController.runJob);
+router.get("/status", jobController.getJobStatus);
+router.post("/run", jobController.runJob);
 
 module.exports = router;

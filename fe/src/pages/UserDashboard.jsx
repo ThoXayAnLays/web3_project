@@ -11,6 +11,7 @@ import {
     InputLabel,
     Typography,
     Checkbox,
+    FormControlLabel,
     ListItemText,
 } from "@mui/material";
 import { ethers } from "ethers";
@@ -272,11 +273,29 @@ const UserDashboard = () => {
             "Withdrawal successful"
         );
     };
-    const handleWithdrawNFTs = () =>
-        handleTransaction(
-            stakingContract.withdrawNFTs({ gasLimit: fixedGasLimit }),
+
+    const handleNFTSelection = (tokenId) => {
+        setSelectedNFTs((prev) =>
+            prev.includes(tokenId)
+                ? prev.filter((id) => id !== tokenId)
+                : [...prev, tokenId]
+        );
+    };
+
+    const handleWithdrawNFTs = async () => {
+        if (selectedNFTs.length === 0) {
+            toast.error("Please select NFTs to withdraw");
+            return;
+        }
+
+        await handleTransaction(
+            stakingContract.withdrawNFTs(selectedNFTs, {
+                gasLimit: fixedGasLimit,
+            }),
             "NFTs withdrawn successfully"
         );
+        setSelectedNFTs([]);
+    };
 
     const handleClaimReward = () =>
         handleTransaction(
@@ -386,18 +405,29 @@ const UserDashboard = () => {
                     </Typography>
                     {stakedNFTs.length > 0 ? (
                         <>
-                            <ul>
-                                {stakedNFTs.map((nftId) => (
-                                    <li key={nftId}>NFT #{nftId}</li>
-                                ))}
-                            </ul>
+                            {stakedNFTs.map((nftId) => (
+                                <FormControlLabel
+                                    key={nftId}
+                                    control={
+                                        <Checkbox
+                                            checked={selectedNFTs.includes(
+                                                nftId
+                                            )}
+                                            onChange={() =>
+                                                handleNFTSelection(nftId)
+                                            }
+                                        />
+                                    }
+                                    label={`NFT #${nftId}`}
+                                />
+                            ))}
                             <Button
                                 variant="contained"
                                 color="warning"
                                 onClick={handleWithdrawNFTs}
-                                disabled={loading || stakedNFTs.length === 0}
+                                disabled={loading || selectedNFTs.length === 0}
                             >
-                                Withdraw All NFTs
+                                Withdraw Selected NFTs
                             </Button>
                         </>
                     ) : (

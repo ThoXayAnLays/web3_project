@@ -16,11 +16,13 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: [
-            "DepositTokenA",
-            "DepositNFTB",
-            "Withdraw",
-            "ClaimReward",
-            "UpdateAPR",
+            "Deposited",
+            "NFTDeposited",
+            "Withdrawn",
+            "RewardClaimed",
+            "APRUpdated",
+            "NFTMinted",
+            "NFTWithdrawn",
         ],
         index: true,
     },
@@ -37,6 +39,14 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
+    },
+    blockNumber: {
+        type: String,
+        required: true,
+    },
+    gasUsed: {
+        type: String,
+        required: true,
     },
 });
 
