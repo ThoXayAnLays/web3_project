@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const transactionRoutes = require("./routes/transactionRoutes");
-const jobRoutes = require("./routes/jobRoutes");
 const { startCronJobs } = require("./jobs/cronJobs");
 
 dotenv.config();
@@ -26,7 +25,6 @@ mongoose
 
 // Routes
 app.use("/api/transactions", transactionRoutes);
-app.use("/api/jobs", jobRoutes);
 
 // Start cron jobs
 startCronJobs();

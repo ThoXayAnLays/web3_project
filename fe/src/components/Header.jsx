@@ -4,7 +4,15 @@ import { useWeb3 } from '../contexts/Web3Context'
 import { Button, Typography } from '@mui/material'
 
 const Header = () => {
-    const { address, isAdmin, connectWallet, tokenABalance, nftBBalance, baseAPR } = useWeb3()
+    const { address, isAdmin, connectWallet, provider, tokenABalance, nftBBalance, baseAPR } = useWeb3()
+
+    const handleConnect = async () => {
+        if (provider) {
+            await connectWallet(provider)
+        } else {
+            console.error('No provider available')
+        }
+    }
 
     return (
         <header className="bg-gray-800 text-white p-4">
@@ -13,7 +21,6 @@ const Header = () => {
                     <ul className="flex space-x-4">
                         <li><Link to="/">Home</Link></li>
                         <li><Link to="/history">History</Link></li>
-                        {isAdmin && <li><Link to="/admin">Admin</Link></li>}
                     </ul>
                 </nav>
                 <div className="flex items-center space-x-4">
@@ -29,7 +36,7 @@ const Header = () => {
                             <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
                         </>
                     ) : (
-                        <Button variant="contained" color="primary" onClick={() => connectWallet(window.ethereum)}>
+                        <Button variant="contained" color="primary" onClick={handleConnect}>
                             Connect Wallet
                         </Button>
                     )}

@@ -22,8 +22,13 @@ module.exports = {
       url: `https://linea-sepolia.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
-    bscTest: {
+    bscTestnet: {
       url: `https://bsc-testnet-rpc.publicnode.com`,
+      accounts: [`0x${process.env.PRIVATE_KEY}`],
+      chainId: 97,
+    },
+    bscTestnet2: {
+      url: `https://bsc-testnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: [`0x${process.env.PRIVATE_KEY}`],
       chainId: 97,
     }

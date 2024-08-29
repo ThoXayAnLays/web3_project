@@ -7,6 +7,7 @@ const StakingInfo = () => {
     const { address, stakingContract, tokenAContract } = useWeb3();
     const [stakingInfo, setStakingInfo] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [remainingLockTime, setRemainingLockTime] = useState(0);
 
     useEffect(() => {
@@ -15,27 +16,22 @@ const StakingInfo = () => {
         const fetchStakingInfo = async () => {
             if (stakingContract && address) {
                 try {
+                    setLoading(true);
+                    setError(null);
+
                     const stake = await stakingContract.stakes(address);
                     const baseAPR = await stakingContract.baseAPR();
                     const nftBonusAPR = await stakingContract.nftBonusAPR();
-                    const reward = await stakingContract.calculateReward(
-                        address
-                    );
-                    const effectiveAPR = baseAPR.add(
-                        nftBonusAPR.mul(stake.nftCount)
-                    );
-                    const lockTime = await stakingContract.getRemainingLockTime(
-                        address
-                    );
+                    const reward = await stakingContract.calculateReward(address);
+                    const effectiveAPR = baseAPR.add(nftBonusAPR.mul(stake.nftCount));
+                    const lockTime = await stakingContract.getRemainingLockTime(address);
 
                     setStakingInfo({
                         stakedAmount: ethers.utils.formatEther(stake.amount),
                         nftCount: stake.nftCount.toString(),
-                        effectiveAPR: effectiveAPR.toNumber() / 100, // Convert basis points to percentage
+                        effectiveAPR: effectiveAPR.toNumber() / 100,
                         reward: ethers.utils.formatEther(reward),
-                        pendingReward: ethers.utils.formatEther(
-                            stake.pendingReward
-                        ),
+                        pendingReward: ethers.utils.formatEther(stake.pendingReward),
                     });
                     setRemainingLockTime(lockTime.toNumber());
 
@@ -52,6 +48,7 @@ const StakingInfo = () => {
                     }, 1000);
                 } catch (error) {
                     console.error("Error fetching staking info:", error);
+                    setError("Failed to fetch staking information. Please try again later.");
                 } finally {
                     setLoading(false);
                 }
@@ -76,6 +73,16 @@ const StakingInfo = () => {
 
     if (loading) {
         return <CircularProgress />;
+    }
+
+    if (error) {
+        return (
+            <Card>
+                <CardContent>
+                    <Typography color="error">{error}</Typography>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (

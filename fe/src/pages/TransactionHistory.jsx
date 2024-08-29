@@ -1,19 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { useWeb3 } from '../contexts/Web3Context';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, TextField, Button, CircularProgress, Select, MenuItem } from '@mui/material';
-import { toast } from 'react-toastify';
+import React, { useState, useEffect } from "react";
+import { ethers } from "ethers";
+import { useWeb3 } from "../contexts/Web3Context";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    Typography,
+    TextField,
+    Button,
+    CircularProgress,
+    Select,
+    MenuItem,
+} from "@mui/material";
+import { toast } from "react-toastify";
 
 const TransactionHistory = () => {
-    const { address, isAdmin } = useWeb3();
+    const { address, isAdmin, stakingContract, updateBaseAPR } = useWeb3();
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [sortBy, setSortBy] = useState('timestamp');
-    const [sortOrder, setSortOrder] = useState('desc');
+    const [searchQuery, setSearchQuery] = useState("");
+    const [sortBy, setSortBy] = useState("timestamp");
+    const [sortOrder, setSortOrder] = useState("desc");
+    const [newAPR, setNewAPR] = useState("");
 
     useEffect(() => {
         if (address) {
@@ -29,7 +45,7 @@ const TransactionHistory = () => {
             const url = isAdmin
                 ? `${baseUrl}/all`
                 : `${baseUrl}/user/${address}`;
-            
+
             const queryParams = new URLSearchParams({
                 page,
                 limit,
@@ -46,7 +62,7 @@ const TransactionHistory = () => {
             setTransactions(data.docs);
             setTotalPages(data.totalPages);
         } catch (error) {
-            console.error('Error fetching transactions:', error);
+            console.error("Error fetching transactions:", error);
             setError(error.message);
             toast.error(`Failed to fetch transactions: ${error.message}`);
         } finally {
@@ -64,11 +80,44 @@ const TransactionHistory = () => {
     };
 
     const handleSortOrderChange = () => {
-        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    };
+
+    const handleUpdateAPR = async () => {
+        if (!newAPR || isNaN(newAPR)) {
+            toast.error("Please enter a valid APR");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const tx = await stakingContract.updateBaseAPR(
+                Math.floor(newAPR * 100),
+                { gasLimit: 900000 }
+            );
+            const receipt = await tx.wait();
+
+            if (receipt.status === 1) {
+                toast.success("APR updated successfully");
+                updateBaseAPR();
+                setNewAPR("");
+            } else {
+                toast.error("Transaction failed. Please try again.");
+            }
+        } catch (error) {
+            console.error("Transaction error:", error);
+            toast.error(`Transaction failed: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (!isAdmin && !address) {
-        return <Typography>Please connect your wallet to view transactions.</Typography>;
+        return (
+            <Typography>
+                Please connect your wallet to view transactions.
+            </Typography>
+        );
     }
 
     return (
@@ -76,13 +125,36 @@ const TransactionHistory = () => {
             <Typography variant="h4" gutterBottom>
                 {isAdmin ? "All Transactions" : "Your Transactions"}
             </Typography>
+            {isAdmin && (
+                <div className="mb-4">
+                    <TextField
+                        label="New APR (%)"
+                        type="number"
+                        value={newAPR}
+                        onChange={(e) => setNewAPR(e.target.value)}
+                        disabled={loading}
+                    />
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleUpdateAPR}
+                        disabled={loading || !newAPR || isNaN(newAPR)}
+                    >
+                        Update APR
+                    </Button>
+                </div>
+            )}
             <div className="mb-4 flex items-center space-x-2">
                 <TextField
                     label="Search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <Button variant="contained" color="primary" onClick={handleSearch}>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleSearch}
+                >
                     Search
                 </Button>
                 <Select value={sortBy} onChange={handleSortChange}>
@@ -91,7 +163,7 @@ const TransactionHistory = () => {
                     <MenuItem value="amount">Amount</MenuItem>
                 </Select>
                 <Button variant="outlined" onClick={handleSortOrderChange}>
-                    {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                    {sortOrder === "asc" ? "Ascending" : "Descending"}
                 </Button>
             </div>
             {loading ? (
@@ -106,7 +178,8 @@ const TransactionHistory = () => {
                                 <TableCell>From</TableCell>
                                 <TableCell>To</TableCell>
                                 <TableCell>Event Type</TableCell>
-                                <TableCell>Amount</TableCell>
+                                <TableCell>Amount (ETH)</TableCell>
+                                <TableCell>Gas Used (ETH)</TableCell>
                                 <TableCell>Timestamp</TableCell>
                             </TableRow>
                         </TableHead>
@@ -116,8 +189,17 @@ const TransactionHistory = () => {
                                     <TableCell>{tx.fromAddress}</TableCell>
                                     <TableCell>{tx.toAddress}</TableCell>
                                     <TableCell>{tx.eventType}</TableCell>
-                                    <TableCell>{tx.amount}</TableCell>
-                                    <TableCell>{new Date(tx.timestamp).toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        {ethers.utils.formatEther(tx.amount)}
+                                    </TableCell>
+                                    <TableCell>
+                                        {ethers.utils.formatEther(tx.gasUsed)}
+                                    </TableCell>
+                                    <TableCell>
+                                        {new Date(
+                                            tx.timestamp
+                                        ).toLocaleString()}
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -132,7 +214,9 @@ const TransactionHistory = () => {
                     >
                         Previous
                     </Button>
-                    <span className="mx-2">Page {page} of {totalPages}</span>
+                    <span className="mx-2">
+                        Page {page} of {totalPages}
+                    </span>
                     <Button
                         disabled={page === totalPages}
                         onClick={() => setPage(page + 1)}
