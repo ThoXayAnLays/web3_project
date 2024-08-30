@@ -103,16 +103,17 @@ async function processEvents(fromBlock, toBlock) {
                     transactionHash: event.transactionHash,
                     blockNumber: event.blockNumber.toString(),
                     gasUsed: transactionReceipt.gasUsed.toString(),
+                    logIndex: event.logIndex.toString(),
                 };
 
-                await Transaction.updateOne(
-                    { transactionHash: event.transactionHash },
+                await Transaction.findOneAndUpdate(
+                    { transactionHash: transactionData.transactionHash, logIndex: transactionData.logIndex },
                     transactionData,
-                    { upsert: true }
+                    { upsert: true, new: true }
                 );
 
                 console.log(
-                    `Processed transaction for event ${event.event} in block ${event.blockNumber}. Gas used: ${transactionData.gasUsed}`
+                    `Processed and saved event ${event.event} in block ${event.blockNumber}. Gas used: ${transactionData.gasUsed}`
                 );
             } catch (error) {
                 console.error(

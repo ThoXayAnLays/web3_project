@@ -38,7 +38,6 @@ const transactionSchema = new mongoose.Schema({
     transactionHash: {
         type: String,
         required: true,
-        unique: true,
     },
     blockNumber: {
         type: String,
@@ -48,7 +47,14 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    logIndex: {
+        type: String,
+        required: true,
+    }
 });
+
+// Create a compound index on transactionHash and logIndex
+transactionSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
 
 transactionSchema.plugin(mongoosePaginate);
 

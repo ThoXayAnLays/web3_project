@@ -56,7 +56,7 @@ export const Web3Provider = ({ children }) => {
                 const isCorrect = network.chainId === parseInt(import.meta.env.VITE_TESTNET_CHAIN_ID)
                 setIsCorrectNetwork(isCorrect)
                 if (!isCorrect) {
-                    toast.error('Please connect to Linea Sepolia Testnet')
+                    toast.error('Please connect to BSC Testnet')
                 }
             } catch (error) {
                 console.error('Error connecting wallet:', error)

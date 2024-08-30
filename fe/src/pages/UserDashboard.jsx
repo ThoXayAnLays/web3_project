@@ -87,24 +87,29 @@ const UserDashboard = () => {
 
     const fetchOwnedNFTs = async () => {
         try {
-            const filter = nftBContract.filters.Transfer(null, address, null);
-            const events = await nftBContract.queryFilter(filter, 0, "latest");
+            const balance = await nftBContract.balanceOf(address);
+            const ownedTokens = [];
+            let tokenId = 0;
 
-            const ownedNFTs = new Set();
-            for (const event of events) {
-                const tokenId = event.args.tokenId.toString();
+            while (ownedTokens.length < balance) {
                 try {
                     const owner = await nftBContract.ownerOf(tokenId);
                     if (owner.toLowerCase() === address.toLowerCase()) {
-                        ownedNFTs.add(tokenId);
+                        ownedTokens.push(tokenId.toString());
                     }
                 } catch (error) {
-                    // NFT has been transferred or burned, ignore it
-                    continue;
+                    // Token might not exist or has been burned, skip it
+                }
+                tokenId++;
+
+                // Add a safety check to prevent infinite loop
+                if (tokenId > 10000) {  // Adjust this number based on your expected maximum NFT count
+                    console.warn("Reached maximum search limit for NFTs");
+                    break;
                 }
             }
 
-            setOwnedNFTs(Array.from(ownedNFTs));
+            setOwnedNFTs(ownedTokens);
         } catch (error) {
             console.error("Error fetching owned NFTs:", error);
             toast.error("Failed to fetch owned NFTs");

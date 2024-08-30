@@ -16,7 +16,7 @@ function App() {
             <div className="App">
                 {!isCorrectNetwork && (
                     <Alert severity="error" style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
-                        Please connect to Linea Sepolia Testnet
+                        Please connect to BSC Testnet
                     </Alert>
                 )}
                 <Header />

@@ -124,6 +124,7 @@ contract Staking is Ownable {
         }
 
         emit Withdrawn(msg.sender, stake.amount, reward);
+        emit RewardClaimed(msg.sender, reward);
 
         delete stakedNFTs[msg.sender];
         delete stakes[msg.sender];
@@ -196,8 +197,6 @@ contract Staking is Ownable {
         if (stake.nftDepositTime > 0) {
             stake.nftDepositTime = block.timestamp;
         }
-
-        emit RewardClaimed(msg.sender, reward);
     }
 
     function claimReward() external {
