@@ -30,12 +30,15 @@ const UserDashboard = () => {
     const [loading, setLoading] = useState(false);
     const [ownedNFTs, setOwnedNFTs] = useState([]);
     const [stakedNFTs, setStakedNFTs] = useState([]);
-    const [selectedNFTs, setSelectedNFTs] = useState([]);
     const [tokenABalance, setTokenABalance] = useState("0");
     const [stakedAmount, setStakedAmount] = useState("0");
     const [reward, setReward] = useState("0");
     const [remainingLockTime, setRemainingLockTime] = useState(0);
-    const [mintedNFTCount, setMintedNFTCount] = useState(0);
+    const [pendingReward, setPendingReward] = useState("0");
+    const [selectedNFTsForDeposit, setSelectedNFTsForDeposit] = useState([]);
+    const [selectedNFTsForWithdrawal, setSelectedNFTsForWithdrawal] = useState(
+        []
+    );
 
     const fixedGasLimit = 900000;
 
@@ -103,7 +106,8 @@ const UserDashboard = () => {
                 tokenId++;
 
                 // Add a safety check to prevent infinite loop
-                if (tokenId > 10000) {  // Adjust this number based on your expected maximum NFT count
+                if (tokenId > 10000) {
+                    // Adjust this number based on your expected maximum NFT count
                     console.warn("Reached maximum search limit for NFTs");
                     break;
                 }
@@ -154,6 +158,8 @@ const UserDashboard = () => {
         try {
             const rewardAmount = await stakingContract.calculateReward(address);
             setReward(ethers.utils.formatEther(rewardAmount));
+            const stake = await stakingContract.stakes(address);
+            setPendingReward(ethers.utils.formatEther(stake.pendingReward));
         } catch (error) {
             console.error("Error fetching reward:", error);
         }
@@ -240,13 +246,34 @@ const UserDashboard = () => {
         setAmount("");
     };
 
+    const handleNFTSelectionForDeposit = (tokenId) => {
+        setSelectedNFTsForDeposit((prev) =>
+            prev.includes(tokenId)
+                ? prev.filter((id) => id !== tokenId)
+                : [...prev, tokenId]
+        );
+    };
+
+    const handleNFTSelectionForWithdrawal = (tokenId) => {
+        setSelectedNFTsForWithdrawal((prev) =>
+            prev.includes(tokenId)
+                ? prev.filter((id) => id !== tokenId)
+                : [...prev, tokenId]
+        );
+    };
+
     const handleDepositNFTs = async () => {
-        if (selectedNFTs.length === 0) {
+        if (selectedNFTsForDeposit.length === 0) {
             toast.error("Please select at least one NFT to deposit");
             return;
         }
 
-        for (const nftId of selectedNFTs) {
+        if (Number(stakedAmount) <= 0) {
+            toast.error("You need to deposit Token A before depositing NFTs");
+            return;
+        }
+
+        for (const nftId of selectedNFTsForDeposit) {
             const approvedAddress = await nftBContract.getApproved(nftId);
             if (approvedAddress !== stakingContract.address) {
                 await handleTransaction(
@@ -262,7 +289,22 @@ const UserDashboard = () => {
                 `NFT #${nftId} deposited successfully`
             );
         }
-        setSelectedNFTs([]);
+        setSelectedNFTsForDeposit([]);
+    };
+
+    const handleWithdrawNFTs = async () => {
+        if (selectedNFTsForWithdrawal.length === 0) {
+            toast.error("Please select NFTs to withdraw");
+            return;
+        }
+
+        await handleTransaction(
+            stakingContract.withdrawNFTs(selectedNFTsForWithdrawal, {
+                gasLimit: fixedGasLimit,
+            }),
+            "NFTs withdrawn successfully"
+        );
+        setSelectedNFTsForWithdrawal([]);
     };
 
     const handleWithdraw = async () => {
@@ -279,29 +321,6 @@ const UserDashboard = () => {
         );
     };
 
-    const handleNFTSelection = (tokenId) => {
-        setSelectedNFTs((prev) =>
-            prev.includes(tokenId)
-                ? prev.filter((id) => id !== tokenId)
-                : [...prev, tokenId]
-        );
-    };
-
-    const handleWithdrawNFTs = async () => {
-        if (selectedNFTs.length === 0) {
-            toast.error("Please select NFTs to withdraw");
-            return;
-        }
-
-        await handleTransaction(
-            stakingContract.withdrawNFTs(selectedNFTs, {
-                gasLimit: fixedGasLimit,
-            }),
-            "NFTs withdrawn successfully"
-        );
-        setSelectedNFTs([]);
-    };
-
     const handleClaimReward = () =>
         handleTransaction(
             stakingContract.claimReward({ gasLimit: fixedGasLimit }),
@@ -315,6 +334,12 @@ const UserDashboard = () => {
             }),
             "Received 2,000,000 TokenA"
         );
+
+    const totalReward = ethers.utils.formatEther(
+        ethers.utils
+            .parseEther(reward)
+            .add(ethers.utils.parseEther(pendingReward))
+    );
 
     return (
         <div className="container mx-auto p-4">
@@ -350,28 +375,49 @@ const UserDashboard = () => {
                         <InputLabel>Select NFTs to Deposit</InputLabel>
                         <Select
                             multiple
-                            value={selectedNFTs}
-                            onChange={(e) => setSelectedNFTs(e.target.value)}
+                            value={selectedNFTsForDeposit}
+                            onChange={(e) =>
+                                setSelectedNFTsForDeposit(e.target.value)
+                            }
                             renderValue={(selected) => selected.join(", ")}
-                            disabled={loading || ownedNFTs.length === 0}
+                            disabled={
+                                loading ||
+                                ownedNFTs.length === 0 ||
+                                Number(stakedAmount) <= 0
+                            }
                         >
-                            {ownedNFTs.map((nftId) => (
-                                <MenuItem key={nftId} value={nftId}>
-                                    <Checkbox
-                                        checked={
-                                            selectedNFTs.indexOf(nftId) > -1
-                                        }
-                                    />
-                                    <ListItemText primary={`NFT #${nftId}`} />
-                                </MenuItem>
-                            ))}
+                            {ownedNFTs
+                                .filter((nftId) => !stakedNFTs.includes(nftId))
+                                .map((nftId) => (
+                                    <MenuItem key={nftId} value={nftId}>
+                                        <Checkbox
+                                            checked={
+                                                selectedNFTsForDeposit.indexOf(
+                                                    nftId
+                                                ) > -1
+                                            }
+                                            onChange={() =>
+                                                handleNFTSelectionForDeposit(
+                                                    nftId
+                                                )
+                                            }
+                                        />
+                                        <ListItemText
+                                            primary={`NFT #${nftId}`}
+                                        />
+                                    </MenuItem>
+                                ))}
                         </Select>
                     </FormControl>
                     <Button
                         variant="contained"
                         color="secondary"
                         onClick={handleDepositNFTs}
-                        disabled={loading || selectedNFTs.length === 0}
+                        disabled={
+                            loading ||
+                            selectedNFTsForDeposit.length === 0 ||
+                            Number(stakedAmount) <= 0
+                        }
                     >
                         Deposit Selected NFTs
                     </Button>
@@ -392,7 +438,7 @@ const UserDashboard = () => {
                     variant="contained"
                     color="success"
                     onClick={handleClaimReward}
-                    disabled={loading || Number(reward) <= 0}
+                    disabled={loading || Number(totalReward) <= 0}
                 >
                     Claim Reward
                 </Button>
@@ -415,11 +461,13 @@ const UserDashboard = () => {
                                     key={nftId}
                                     control={
                                         <Checkbox
-                                            checked={selectedNFTs.includes(
+                                            checked={selectedNFTsForWithdrawal.includes(
                                                 nftId
                                             )}
                                             onChange={() =>
-                                                handleNFTSelection(nftId)
+                                                handleNFTSelectionForWithdrawal(
+                                                    nftId
+                                                )
                                             }
                                         />
                                     }
@@ -430,7 +478,10 @@ const UserDashboard = () => {
                                 variant="contained"
                                 color="warning"
                                 onClick={handleWithdrawNFTs}
-                                disabled={loading || selectedNFTs.length === 0}
+                                disabled={
+                                    loading ||
+                                    selectedNFTsForWithdrawal.length === 0
+                                }
                             >
                                 Withdraw Selected NFTs
                             </Button>
