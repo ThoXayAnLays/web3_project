@@ -27,6 +27,22 @@ const eventNames = [
     "NFTWithdrawn",
 ];
 
+async function initializeCrawling() {
+    const lastCrawledBlock = await LastCrawledBlock.findOne({ contractName: "Staking" });
+    const configDeploymentBlock = BigInt(config.DEPLOYMENT_BLOCK);
+
+    if (!lastCrawledBlock || BigInt(lastCrawledBlock.blockNumber) < configDeploymentBlock) {
+        // New contract deployed or first run
+        await Transaction.deleteMany({}); // Clear all old transactions
+        await LastCrawledBlock.findOneAndUpdate(
+            { contractName: "Staking" },
+            { blockNumber: configDeploymentBlock.toString() },
+            { upsert: true }
+        );
+        console.log("Cleared old data and reset last crawled block to deployment block");
+    }
+}
+
 async function initializeContracts() {
     const addresses = await getContractAddresses();
     const abis = await getContractABIs();
@@ -63,6 +79,7 @@ async function updateLastCrawledBlock(blockNumber) {
         blockNumber.toString()
     );
 }
+
 
 async function processEvents(fromBlock, toBlock) {
     console.log(`Processing events from block ${fromBlock} to ${toBlock}`);
@@ -189,13 +206,11 @@ async function crawlEvents() {
 
 function startCronJobs() {
     initializeContracts().then(() => {
-        const job = schedule.scheduleJob(CRON_SCHEDULE, crawlEvents);
-        console.log(
-            `Cron job scheduled to run according to schedule: ${CRON_SCHEDULE}`
-        );
-
-        // Run immediately after startup
-        crawlEvents();
+        initializeCrawling().then(() => {
+            const job = schedule.scheduleJob(CRON_SCHEDULE, crawlEvents);
+            console.log(`Cron job scheduled to run according to schedule: ${CRON_SCHEDULE}`);
+            crawlEvents(); // Run immediately after startup
+        });
     });
 }
 

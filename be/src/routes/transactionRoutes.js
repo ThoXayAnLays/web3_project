@@ -5,6 +5,6 @@ const { isAdmin } = require("../middleware/authMiddleware");
 
 router.get("/user/:address", transactionController.getUserTransactions);
 router.get("/all", transactionController.getAllTransactions);
-// router.get("/search", transactionController.searchTransactions);
+router.get("/lastCrawledBlock", transactionController.getLastCrawledBlock);
 
 module.exports = router;

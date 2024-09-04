@@ -90,30 +90,8 @@ const UserDashboard = () => {
 
     const fetchOwnedNFTs = async () => {
         try {
-            const balance = await nftBContract.balanceOf(address);
-            const ownedTokens = [];
-            let tokenId = 0;
-
-            while (ownedTokens.length < balance) {
-                try {
-                    const owner = await nftBContract.ownerOf(tokenId);
-                    if (owner.toLowerCase() === address.toLowerCase()) {
-                        ownedTokens.push(tokenId.toString());
-                    }
-                } catch (error) {
-                    // Token might not exist or has been burned, skip it
-                }
-                tokenId++;
-
-                // Add a safety check to prevent infinite loop
-                if (tokenId > 10000) {
-                    // Adjust this number based on your expected maximum NFT count
-                    console.warn("Reached maximum search limit for NFTs");
-                    break;
-                }
-            }
-
-            setOwnedNFTs(ownedTokens);
+            const ownedNFTs = await stakingContract.getOwnedNFTs(address);
+            setOwnedNFTs(ownedNFTs.map(nft => nft.toString()));
         } catch (error) {
             console.error("Error fetching owned NFTs:", error);
             toast.error("Failed to fetch owned NFTs");

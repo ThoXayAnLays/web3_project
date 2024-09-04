@@ -1,4 +1,5 @@
 const Transaction = require("../models/Transaction");
+const LastCrawledBlock = require("../models/LastCrawledBlock");
 
 exports.getUserTransactions = async (req, res) => {
     try {
@@ -81,5 +82,16 @@ exports.getAllTransactions = async (req, res) => {
             message: "Error fetching all transactions",
             error: error.message,
         });
+    }
+};
+
+
+exports.getLastCrawledBlock = async (req, res) => {
+    try {
+        const lastCrawled = await LastCrawledBlock.findOne({ contractName: "Staking" });
+        res.json({ lastCrawledBlock: lastCrawled ? lastCrawled.blockNumber : null });
+    } catch (error) {
+        console.error("Error fetching last crawled block:", error);
+        res.status(500).json({ error: "Failed to fetch last crawled block" });
     }
 };

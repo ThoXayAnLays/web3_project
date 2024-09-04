@@ -77,6 +77,23 @@ contract Staking is Ownable {
         emit Deposited(msg.sender, amount);
     }
 
+    function getOwnedNFTs(address user) external view returns (uint256[] memory) {
+        uint256 balance = nftB.balanceOf(user);
+        uint256[] memory ownedNFTs = new uint256[](balance);
+        uint256 index = 0;
+        uint256 tokenId = 0;
+
+        while (index < balance) {
+            if (nftB.ownerOf(tokenId) == user) {
+                ownedNFTs[index] = tokenId;
+                index++;
+            }
+            tokenId++;
+        }
+
+        return ownedNFTs;
+    }
+
     function depositNFT(uint256 tokenId) external {
         require(nftB.ownerOf(tokenId) == msg.sender, "You don't own this NFT");
         nftB.transferFrom(msg.sender, address(this), tokenId);

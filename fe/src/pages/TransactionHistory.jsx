@@ -29,11 +29,13 @@ const TransactionHistory = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("timestamp");
     const [sortOrder, setSortOrder] = useState("desc");
+    const [lastCrawledBlock, setLastCrawledBlock] = useState(null);
     const [newAPR, setNewAPR] = useState("");
 
     useEffect(() => {
         if (address) {
             fetchTransactions();
+            fetchLastCrawledBlock();
         }
     }, [address, isAdmin, page, limit, sortBy, sortOrder]);
 
@@ -67,6 +69,20 @@ const TransactionHistory = () => {
             toast.error(`Failed to fetch transactions: ${error.message}`);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchLastCrawledBlock = async () => {
+        try {
+            const response = await fetch(`${import.meta.env.VITE_BE_API}/transactions/lastCrawledBlock`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            setLastCrawledBlock(data.lastCrawledBlock);
+        } catch (error) {
+            console.error("Error fetching last crawled block:", error);
+            toast.error("Failed to fetch last crawled block");
         }
     };
 
@@ -125,6 +141,11 @@ const TransactionHistory = () => {
             <Typography variant="h4" gutterBottom>
                 {isAdmin ? "All Transactions" : "Your Transactions"}
             </Typography>
+            {lastCrawledBlock && (
+                <Typography variant="body2" className="mb-2">
+                    Last Crawled Block: {lastCrawledBlock}
+                </Typography>
+            )}
             {isAdmin && (
                 <div className="mb-4">
                     <TextField
@@ -178,6 +199,7 @@ const TransactionHistory = () => {
                                 <TableCell>From</TableCell>
                                 <TableCell>To</TableCell>
                                 <TableCell>Event Type</TableCell>
+                                <TableCell>Block</TableCell>
                                 <TableCell>Amount (ETH)</TableCell>
                                 <TableCell>Gas Used (ETH)</TableCell>
                                 <TableCell>Timestamp</TableCell>
@@ -189,6 +211,7 @@ const TransactionHistory = () => {
                                     <TableCell>{tx.fromAddress}</TableCell>
                                     <TableCell>{tx.toAddress}</TableCell>
                                     <TableCell>{tx.eventType}</TableCell>
+                                    <TableCell>{tx.blockNumber}</TableCell>
                                     <TableCell>
                                         {ethers.utils.formatEther(tx.amount)}
                                     </TableCell>

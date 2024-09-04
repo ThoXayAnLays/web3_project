@@ -1,5 +1,6 @@
 const path = require("path");
 const { ethers } = require("hardhat");
+const fs = require("fs");
 
 async function main() {
   if (network.name === "hardhat") {
@@ -35,8 +36,12 @@ async function main() {
     console.log("Deploying Staking...");
     const Staking = await ethers.getContractFactory("Staking");
     const staking = await Staking.deploy(tokenA.address, nftB.address);
-    await staking.deployed();
+    
+    // Wait for the transaction to be mined
+    const receipt = await staking.deployTransaction.wait();
+    
     console.log("Staking contract address: ", staking.address);
+    console.log("Staking contract deployed at block:", receipt.blockNumber);
 
     await tokenA.setStakingContract(staking.address);
     console.log("Staking contract set in TokenA");
@@ -49,6 +54,9 @@ async function main() {
       Staking: staking.address,
     });
 
+    // Update backend configuration
+    updateBackendConfig(receipt.blockNumber);
+
     console.log("Deployment completed successfully.");
   } catch (error) {
     console.error("Error during deployment:", error);
@@ -57,7 +65,6 @@ async function main() {
 }
 
 function saveFrontendFiles(addresses) {
-  const fs = require("fs");
   const contractsDir = path.join(__dirname, "..", "..", "fe", "src", "contracts");
 
   if (!fs.existsSync(contractsDir)) {
@@ -97,6 +104,33 @@ function saveFrontendFiles(addresses) {
       JSON.stringify(ContractArtifact, null, 2)
     );
   });
+}
+
+function updateBackendConfig(deploymentBlockNumber) {
+  const configPath = path.join(__dirname, "..", "..", "be", "src", "config.js");
+  
+  let configContent = fs.readFileSync(configPath, 'utf8');
+  
+  // Parse the existing config
+  const configMatch = configContent.match(/module\.exports\s*=\s*({[\s\S]*?});/);
+  if (configMatch) {
+    let config = eval('(' + configMatch[1] + ')');
+    
+    // Update only the DEPLOYMENT_BLOCK
+    config.DEPLOYMENT_BLOCK = deploymentBlockNumber;
+    
+    // Reconstruct the config string
+    const updatedConfig = `module.exports = ${JSON.stringify(config, null, 4)};`;
+    
+    // Replace the entire module.exports in the file
+    configContent = configContent.replace(/module\.exports\s*=\s*{[\s\S]*?};/, updatedConfig);
+    
+    fs.writeFileSync(configPath, configContent);
+    
+    console.log(`Backend config updated with deployment block: ${deploymentBlockNumber}`);
+  } else {
+    console.error("Could not find module.exports in config file");
+  }
 }
 
 main()
