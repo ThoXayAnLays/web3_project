@@ -106,6 +106,7 @@ const UserDashboard = () => {
             const nfts = [];
             for (let i = 0; i < nftCount; i++) {
                 const tokenId = await stakingContract.stakedNFTs(address, i);
+                console.log("Staked NFT:", tokenId.toString());
                 nfts.push(tokenId.toString());
             }
             setStakedNFTs(nfts);

@@ -156,6 +156,21 @@ export const Web3Provider = ({ children }) => {
     }, [connectWallet])
 
     useEffect(() => {
+        const checkIfWalletIsConnected = async () => {
+            if (window.ethereum) {
+                const provider = new ethers.providers.Web3Provider(window.ethereum)
+                setProvider(provider)
+                const accounts = await provider.listAccounts()
+                if (accounts.length > 0) {
+                    await connectWallet()
+                }
+            }
+        }
+
+        checkIfWalletIsConnected()
+    }, [connectWallet])
+
+    useEffect(() => {
         checkIfWalletIsConnected()
     }, [checkIfWalletIsConnected])
 

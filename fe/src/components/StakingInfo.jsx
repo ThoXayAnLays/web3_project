@@ -22,16 +22,26 @@ const StakingInfo = () => {
                     const stake = await stakingContract.stakes(address);
                     const baseAPR = await stakingContract.baseAPR();
                     const nftBonusAPR = await stakingContract.nftBonusAPR();
-                    const reward = await stakingContract.calculateReward(address);
-                    const effectiveAPR = baseAPR.add(nftBonusAPR.mul(stake.nftCount));
-                    const lockTime = await stakingContract.getRemainingLockTime(address);
+                    const reward = await stakingContract.calculateReward(
+                        address
+                    );
+                    const effectiveAPR = baseAPR.add(
+                        nftBonusAPR.mul(stake.nftCount)
+                    );
+                    const lockTime = await stakingContract.getRemainingLockTime(
+                        address
+                    );
+
+                    console.log("Fetched lock time:", lockTime.toString());
 
                     setStakingInfo({
                         stakedAmount: ethers.utils.formatEther(stake.amount),
                         nftCount: stake.nftCount.toString(),
                         effectiveAPR: effectiveAPR.toNumber() / 100,
                         reward: ethers.utils.formatEther(reward),
-                        pendingReward: ethers.utils.formatEther(stake.pendingReward),
+                        pendingReward: ethers.utils.formatEther(
+                            stake.pendingReward
+                        ),
                     });
                     setRemainingLockTime(lockTime.toNumber());
 
@@ -48,7 +58,9 @@ const StakingInfo = () => {
                     }, 1000);
                 } catch (error) {
                     console.error("Error fetching staking info:", error);
-                    setError("Failed to fetch staking information. Please try again later.");
+                    setError(
+                        "Failed to fetch staking information. Please try again later."
+                    );
                 } finally {
                     setLoading(false);
                 }
@@ -66,9 +78,11 @@ const StakingInfo = () => {
 
     const formatTime = (seconds) => {
         if (seconds <= 0) return "Unlocked";
-        const minutes = Math.floor(seconds / 60);
+        const days = Math.floor(seconds / (3600 * 24));
+        const hours = Math.floor((seconds % (3600 * 24)) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
         const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds.toString().padStart(2, "0")}s`;
+        return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
     };
 
     if (loading) {

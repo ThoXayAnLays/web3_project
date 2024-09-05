@@ -7,10 +7,14 @@ const Header = () => {
     const { address, isAdmin, connectWallet, provider, tokenABalance, nftBBalance, baseAPR } = useWeb3()
 
     const handleConnect = async () => {
-        if (provider) {
-            await connectWallet(provider)
-        } else {
-            console.error('No provider available')
+        try {
+            if (window.ethereum) {
+                await connectWallet()
+            } else {
+                console.error('No Ethereum provider available')
+            }
+        } catch (error) {
+            console.error('Error connecting wallet:', error)
         }
     }
 
