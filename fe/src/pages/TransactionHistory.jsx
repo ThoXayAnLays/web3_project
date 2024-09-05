@@ -26,6 +26,7 @@ const TransactionHistory = () => {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalTransactions, setTotalTransactions] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("timestamp");
     const [sortOrder, setSortOrder] = useState("desc");
@@ -36,6 +37,11 @@ const TransactionHistory = () => {
         if (address) {
             fetchTransactions();
             fetchLastCrawledBlock();
+            const intervalId = setInterval(() => {
+                fetchTransactions();
+                fetchLastCrawledBlock();
+            }, 30000);
+            return () => clearInterval(intervalId);
         }
     }, [address, isAdmin, page, limit, sortBy, sortOrder]);
 
@@ -63,6 +69,7 @@ const TransactionHistory = () => {
             const data = await response.json();
             setTransactions(data.docs);
             setTotalPages(data.totalPages);
+            setTotalTransactions(data.totalDocs);
         } catch (error) {
             console.error("Error fetching transactions:", error);
             setError(error.message);
@@ -74,7 +81,9 @@ const TransactionHistory = () => {
 
     const fetchLastCrawledBlock = async () => {
         try {
-            const response = await fetch(`${import.meta.env.VITE_BE_API}/transactions/lastCrawledBlock`);
+            const response = await fetch(
+                `${import.meta.env.VITE_BE_API}/transactions/lastCrawledBlock`
+            );
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -140,6 +149,9 @@ const TransactionHistory = () => {
         <div className="container mx-auto bg-white-800 p-4">
             <Typography variant="h4" gutterBottom>
                 {isAdmin ? "All Transactions" : "Your Transactions"}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+                Total Transactions: {totalTransactions}
             </Typography>
             {lastCrawledBlock && (
                 <Typography variant="body2" className="mb-2">

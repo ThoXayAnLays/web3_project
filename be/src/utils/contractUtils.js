@@ -10,7 +10,12 @@ async function getContractAddresses() {
     );
     try {
         const addressesJson = await fs.readFile(addressesPath, "utf-8");
-        return JSON.parse(addressesJson);
+        const addresses = JSON.parse(addressesJson);
+        return {
+            TokenA: addresses.UpgradeableTokenA,
+            NFTB: addresses.UpgradeableNFTB,
+            Staking: addresses.UpgradeableStaking
+        };
     } catch (error) {
         console.error("Error reading contract addresses:", error);
         throw error;
@@ -19,13 +24,13 @@ async function getContractAddresses() {
 
 async function getContractABIs() {
     const abis = {};
-    const contractNames = ["TokenA", "NFTB", "Staking"];
+    const contractNames = ["UpgradeableTokenA", "UpgradeableNFTB", "UpgradeableStaking"];
 
     for (const name of contractNames) {
         const abiPath = path.join(__dirname, "..", "contracts", `${name}.json`);
         try {
             const abiJson = await fs.readFile(abiPath, "utf-8");
-            abis[name] = JSON.parse(abiJson).abi;
+            abis[name.replace("Upgradeable", "")] = JSON.parse(abiJson).abi;
         } catch (error) {
             console.error(`Error reading ABI for ${name}:`, error);
             throw error;
@@ -36,12 +41,18 @@ async function getContractABIs() {
 }
 
 async function getDeploymentBlocks() {
-    // Replace these with the actual deployment block numbers
-    return {
-        tokenA: "3614880", // Example block number, replace with actual
-        nftB: "3614882", // Example block number, replace with actual
-        staking: "3614884", // Example block number, replace with actual
-    };
+    const configPath = path.join(__dirname, "..", "config.js");
+    try {
+        const config = require(configPath);
+        return {
+            tokenA: config.DEPLOYMENT_BLOCK,
+            nftB: config.DEPLOYMENT_BLOCK,
+            staking: config.DEPLOYMENT_BLOCK,
+        };
+    } catch (error) {
+        console.error("Error reading deployment blocks:", error);
+        throw error;
+    }
 }
 
 module.exports = {

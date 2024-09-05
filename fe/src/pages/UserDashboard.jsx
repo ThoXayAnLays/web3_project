@@ -24,6 +24,7 @@ const UserDashboard = () => {
         nftBContract,
         stakingContract,
         updateBalances,
+        boostRewardPercentage,
         provider,
     } = useWeb3();
     const [amount, setAmount] = useState("");
@@ -191,6 +192,21 @@ const UserDashboard = () => {
         }
     };
 
+    const approveAllNFTs = async () => {
+        try {
+            const isApprovedForAll = await nftBContract.isApprovedForAll(address, stakingContract.address);
+            if (!isApprovedForAll) {
+                await handleTransaction(
+                    nftBContract.setApprovalForAll(stakingContract.address, true),
+                    "Approved all NFTs for staking"
+                );
+            }
+        } catch (error) {
+            console.error("Error approving all NFTs:", error);
+            toast.error("Failed to approve all NFTs");
+        }
+    };
+
     const handleDeposit = async () => {
         if (
             !amount ||
@@ -251,23 +267,22 @@ const UserDashboard = () => {
             return;
         }
 
-        for (const nftId of selectedNFTsForDeposit) {
-            const approvedAddress = await nftBContract.getApproved(nftId);
-            if (approvedAddress !== stakingContract.address) {
+        try {
+            await approveAllNFTs();
+
+            for (const nftId of selectedNFTsForDeposit) {
                 await handleTransaction(
-                    nftBContract.approve(stakingContract.address, nftId, {
-                        gasLimit: fixedGasLimit,
-                    }),
-                    `NFT #${nftId} approval successful`
+                    stakingContract.depositNFT(nftId, { gasLimit: fixedGasLimit }),
+                    `NFT #${nftId} deposited successfully`
                 );
             }
-
-            await handleTransaction(
-                stakingContract.depositNFT(nftId, { gasLimit: fixedGasLimit }),
-                `NFT #${nftId} deposited successfully`
-            );
+            setSelectedNFTsForDeposit([]);
+            fetchOwnedNFTs();
+            fetchStakedNFTs();
+        } catch (error) {
+            console.error("Error depositing NFTs:", error);
+            toast.error("Failed to deposit NFTs");
         }
-        setSelectedNFTsForDeposit([]);
     };
 
     const handleWithdrawNFTs = async () => {
@@ -283,6 +298,8 @@ const UserDashboard = () => {
             "NFTs withdrawn successfully"
         );
         setSelectedNFTsForWithdrawal([]);
+        fetchOwnedNFTs();
+        fetchStakedNFTs();
     };
 
     const handleWithdraw = async () => {
@@ -325,6 +342,11 @@ const UserDashboard = () => {
                 User Dashboard
             </Typography>
             <StakingInfo />
+            {boostRewardPercentage !== null && (
+                <Typography variant="body1" gutterBottom>
+                    Current Boost Reward Percentage: {boostRewardPercentage}%
+                </Typography>
+            )}
             <div className="mt-4 space-y-4">
                 <div>
                     <TextField

@@ -8,7 +8,11 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract UpgradeableStakingV2 is
+    Initializable,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
     UpgradeableTokenA public tokenA;
     UpgradeableNFTB public nftB;
 
@@ -32,6 +36,9 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
     mapping(address => uint256[]) public stakedNFTs;
     mapping(address => uint256) public mintedNFTs;
 
+    uint256 public boostRewardPercentage;
+    mapping(address => bool) public isStakeBoosted;
+
     event Deposited(address indexed user, uint256 amount);
     event NFTDeposited(address indexed user, uint256 tokenId);
     event Withdrawn(address indexed user, uint256 amount, uint256 reward);
@@ -39,6 +46,7 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
     event APRUpdated(uint256 newBaseAPR);
     event NFTMinted(address indexed user, uint256 tokenId);
     event NFTWithdrawn(address indexed user, uint256 tokenId);
+    event BoostActivated(address indexed user);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -48,14 +56,20 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
     function initialize(address _tokenA, address _nftB) public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
-        
+
         tokenA = UpgradeableTokenA(_tokenA);
         nftB = UpgradeableNFTB(_nftB);
         baseAPR = 800;
         nftBonusAPR = 200;
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function initializeV2() public reinitializer(2) {
+        boostRewardPercentage = 10;
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
     function deposit(uint256 amount) external {
         require(amount > 0, "Amount must be greater than 0");
@@ -91,7 +105,9 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
         emit Deposited(msg.sender, amount);
     }
 
-    function getOwnedNFTs(address user) external view returns (uint256[] memory) {
+    function getOwnedNFTs(
+        address user
+    ) external view returns (uint256[] memory) {
         uint256 balance = nftB.balanceOf(user);
         uint256[] memory ownedNFTs = new uint256[](balance);
         uint256 index = 0;
@@ -280,7 +296,25 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
             );
         }
 
+        // Apply boost if activated
+        if (isStakeBoosted[user]) {
+            reward = reward * (100 + boostRewardPercentage) / 100;
+        }
+
+
         return reward;
+    }
+
+    function activateBoost() external {
+        require(stakes[msg.sender].amount > 0, "No active stake");
+        require(!isStakeBoosted[msg.sender], "Boost already activated");
+
+        isStakeBoosted[msg.sender] = true;
+        emit BoostActivated(msg.sender);
+    }
+
+    function setBoostRewardPercentage(uint256 _boostRewardPercentage) external onlyOwner {
+        boostRewardPercentage = _boostRewardPercentage;
     }
 
     function getCurrentAPR(address user) public view returns (uint256) {

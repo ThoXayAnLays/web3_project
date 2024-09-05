@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { toast } from 'react-toastify'
-import TokenAJson from '../contracts/TokenA.json'
-import NFTBJson from '../contracts/NFTB.json'
-import StakingJson from '../contracts/Staking.json'
+import UpgradeableTokenAJson from '../contracts/UpgradeableTokenA.json'
+import UpgradeableNFTBJson from '../contracts/UpgradeableNFTB.json'
+import UpgradeableStakingJson from '../contracts/UpgradeableStaking.json'
 import contractAddresses from '../contracts/contract-address.json'
 
 const Web3Context = createContext()
@@ -21,6 +21,7 @@ export const Web3Provider = ({ children }) => {
     const [tokenABalance, setTokenABalance] = useState('0')
     const [nftBBalance, setNFTBBalance] = useState('0')
     const [baseAPR, setBaseAPR] = useState(null)
+    const [boostRewardPercentage, setBoostRewardPercentage] = useState(null)
     const [isCorrectNetwork, setIsCorrectNetwork] = useState(true)
     const [isConnected, setIsConnected] = useState(false)
     const [chainId, setChainId] = useState(null)
@@ -38,9 +39,10 @@ export const Web3Provider = ({ children }) => {
                 setIsAdmin(address.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS.toLowerCase())
                 setIsConnected(true)
 
-                const tokenA = new ethers.Contract(contractAddresses.TokenA, TokenAJson.abi, signer)
-                const nftB = new ethers.Contract(contractAddresses.NFTB, NFTBJson.abi, signer)
-                const staking = new ethers.Contract(contractAddresses.Staking, StakingJson.abi, signer)
+                
+                const tokenA = new ethers.Contract(contractAddresses.UpgradeableTokenA, UpgradeableTokenAJson.abi, signer)
+                const nftB = new ethers.Contract(contractAddresses.UpgradeableNFTB, UpgradeableNFTBJson.abi, signer)
+                const staking = new ethers.Contract(contractAddresses.UpgradeableStaking, UpgradeableStakingJson.abi, signer)
 
                 setTokenAContract(tokenA)
                 setNFTBContract(nftB)
@@ -48,6 +50,7 @@ export const Web3Provider = ({ children }) => {
 
                 await updateBalances(address, tokenA, nftB)
                 await updateBaseAPR(staking)
+                await updateBoostRewardPercentage(staking)
 
                 // Check network
                 const network = await provider.getNetwork()
@@ -83,9 +86,25 @@ export const Web3Provider = ({ children }) => {
     const updateBaseAPR = async (staking) => {
         try {
             const apr = await staking.baseAPR()
-            setBaseAPR(apr.toNumber() / 100) // Convert from basis points to percentage
+            console.log("Base APR: ", apr.toNumber() / 100);
+            setBaseAPR(apr.toNumber() / 100)
         } catch (error) {
             console.error('Error fetching base APR:', error)
+        }
+    }
+
+    const updateBoostRewardPercentage = async (staking) => {
+        try {
+            if (staking.boostRewardPercentage) {
+                const boost = await staking.boostRewardPercentage()
+                console.log("Boost percentage: ", boost.toNumber() / 100);
+                setBoostRewardPercentage(boost.toNumber() / 100)
+            } else {
+                setBoostRewardPercentage(null)
+            }
+        } catch (error) {
+            console.error('Error fetching boost reward percentage:', error)
+            setBoostRewardPercentage(null)
         }
     }
 
@@ -153,6 +172,7 @@ export const Web3Provider = ({ children }) => {
         baseAPR,
         chainId,
         isCorrectNetwork,
+        boostRewardPercentage,
         isConnected,
         connectWallet,
         updateBalances,

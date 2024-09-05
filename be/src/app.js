@@ -10,6 +10,7 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
+    methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'X-User-Address']
 }));
 app.use(express.json());

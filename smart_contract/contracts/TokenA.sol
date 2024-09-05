@@ -1,18 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract TokenA is ERC20, Ownable {
+contract UpgradeableTokenA is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     uint256 public constant TOTAL_SUPPLY = 1000000000 * 10**18;
     uint256 public constant MAX_FAUCET_AMOUNT = 5000000 * 10**18;
     uint256 public constant MAX_REWARD_AMOUNT = 1000000 * 10**18; 
     address public stakingContract;
 
-    constructor() ERC20("Token A", "TKA") Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize() public initializer {
+        __ERC20_init("Token A", "TKA");
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+
         _mint(address(this), TOTAL_SUPPLY);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function setStakingContract(address _stakingContract) external onlyOwner {
         stakingContract = _stakingContract;
