@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useWeb3 } from "../contexts/Web3Context";
 import { ethers } from "ethers";
-import { Card, CardContent, Typography, CircularProgress } from "@mui/material";
+import { Card, CardContent, Typography } from "@mui/material";
 
 const StakingInfo = () => {
     const { address, stakingContract, tokenAContract } = useWeb3();
     const [stakingInfo, setStakingInfo] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [remainingLockTime, setRemainingLockTime] = useState(0);
 
@@ -16,7 +15,6 @@ const StakingInfo = () => {
         const fetchStakingInfo = async () => {
             if (stakingContract && address) {
                 try {
-                    setLoading(true);
                     setError(null);
 
                     const stake = await stakingContract.stakes(address);
@@ -61,14 +59,12 @@ const StakingInfo = () => {
                     setError(
                         "Failed to fetch staking information. Please try again later."
                     );
-                } finally {
-                    setLoading(false);
                 }
             }
         };
 
         fetchStakingInfo();
-        const fetchInterval = setInterval(fetchStakingInfo, 30000); // Refresh staking info every 30 seconds
+        const fetchInterval = setInterval(fetchStakingInfo, 30000);
 
         return () => {
             clearInterval(fetchInterval);
@@ -84,10 +80,6 @@ const StakingInfo = () => {
         const remainingSeconds = seconds % 60;
         return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
     };
-
-    if (loading) {
-        return <CircularProgress />;
-    }
 
     if (error) {
         return (
