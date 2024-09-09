@@ -8,7 +8,7 @@ import UserDashboard from './pages/UserDashboard'
 import TransactionHistory from './pages/TransactionHistory'
 import { useWeb3 } from './contexts/Web3Context'
 import { Alert } from '@mui/material'
-import theme from './theme' // Import the custom theme
+import theme from './theme'
 
 function App() {
     const { chainId } = useWeb3()
@@ -35,6 +35,7 @@ function App() {
                         <Routes>
                             <Route path="/" element={<UserDashboard />} />
                             <Route path="/history" element={<TransactionHistory />} />
+                            <Route path="/history/:address" element={<TransactionHistory />} />
                         </Routes>
                     </Box>
                 </Box>

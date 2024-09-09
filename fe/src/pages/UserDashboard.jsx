@@ -45,6 +45,7 @@ const UserDashboard = () => {
     );
     const [totalReward, setTotalReward] = useState("0");
     const [updateTrigger, setUpdateTrigger] = useState(0);
+    const [tokenARemaining, setTokenARemaining] = useState("0");
 
     const fixedGasLimit = 900000;
 
@@ -64,7 +65,9 @@ const UserDashboard = () => {
     const fetchTotalReward = useCallback(async () => {
         if (stakingContract && address) {
             try {
-                const calculatedReward = await stakingContract.calculateReward(address);
+                const calculatedReward = await stakingContract.calculateReward(
+                    address
+                );
                 const stake = await stakingContract.stakes(address);
                 const pendingReward = stake.pendingReward;
                 const total = calculatedReward.add(pendingReward);
@@ -104,6 +107,22 @@ const UserDashboard = () => {
         return `${days}d ${hours}h ${minutes}m`;
     };
 
+    const fetchTokenARemaining = useCallback(async () => {
+        if (tokenAContract) {
+            try {
+                const contractBalance = await tokenAContract.balanceOf(
+                    tokenAContract.address
+                );
+                setTokenARemaining(ethers.utils.formatEther(contractBalance));
+            } catch (error) {
+                console.error(
+                    "Error fetching Token A remaining balance:",
+                    error
+                );
+            }
+        }
+    }, [tokenAContract]);
+
     useEffect(() => {
         if (address && tokenAContract && nftBContract && stakingContract) {
             fetchOwnedNFTs();
@@ -111,8 +130,15 @@ const UserDashboard = () => {
             fetchTokenABalance();
             fetchStakedAmount();
             fetchReward();
+            fetchTokenARemaining();
         }
-    }, [address, tokenAContract, nftBContract, stakingContract]);
+    }, [
+        address,
+        tokenAContract,
+        nftBContract,
+        stakingContract,
+        fetchTokenARemaining,
+    ]);
 
     const fetchOwnedNFTs = async () => {
         try {
@@ -185,6 +211,7 @@ const UserDashboard = () => {
                 fetchOwnedNFTs();
                 fetchStakedNFTs();
                 fetchRemainingLockTime();
+                fetchTokenARemaining();
                 setUpdateTrigger((prev) => prev + 1);
             } else {
                 toast.error("Transaction failed. Please try again.");
@@ -370,6 +397,10 @@ const UserDashboard = () => {
             <Typography variant="h4" gutterBottom>
                 User Dashboard
             </Typography>
+            <Typography variant="body1" gutterBottom sx={{ mt: 2 }}>
+                Token A Remaining in Contract:{" "}
+                {parseFloat(tokenARemaining).toLocaleString()} TokenA
+            </Typography>
             <Grid container spacing={3}>
                 <Grid item xs={12} md={5}>
                     <Paper elevation={3} sx={{ p: 2, height: "100%" }}>
@@ -401,12 +432,14 @@ const UserDashboard = () => {
                             </Button>
                         </Grid>
                         <Grid item xs={12} sx={{ mt: 2 }}>
-                        <Button
+                            <Button
                                 fullWidth
                                 variant="contained"
                                 color="success"
                                 onClick={handleClaimReward}
-                                disabled={loading || parseFloat(totalReward) <= 0}
+                                disabled={
+                                    loading || parseFloat(totalReward) <= 0
+                                }
                             >
                                 Claim Reward
                             </Button>

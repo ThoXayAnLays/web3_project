@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { useWeb3 } from "../contexts/Web3Context";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     Table,
     TableBody,
@@ -15,11 +16,14 @@ import {
     CircularProgress,
     Select,
     MenuItem,
+    Link,
 } from "@mui/material";
 import { toast } from "react-toastify";
 
 const TransactionHistory = () => {
-    const { address, isAdmin, stakingContract, updateBaseAPR } = useWeb3();
+    const { address: connectedAddress, isAdmin, stakingContract, updateBaseAPR } = useWeb3();
+    const { address } = useParams();
+    const navigate = useNavigate();
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -34,25 +38,33 @@ const TransactionHistory = () => {
     const [newAPR, setNewAPR] = useState("");
 
     useEffect(() => {
-        if (address) {
+        if (isAdmin && !address) {
             fetchTransactions();
-            fetchLastCrawledBlock();
-            const intervalId = setInterval(() => {
-                fetchTransactions();
-                fetchLastCrawledBlock();
-            }, 30000);
-            return () => clearInterval(intervalId);
+        } else if (address) {
+            fetchTransactions(address);
+        } else if (connectedAddress) {
+            navigate(`/history/${connectedAddress}`);
         }
-    }, [address, isAdmin, page, limit, sortBy, sortOrder]);
+        fetchLastCrawledBlock();
+        const intervalId = setInterval(() => {
+            if (isAdmin && !address) {
+                fetchTransactions();
+            } else if (address) {
+                fetchTransactions(address);
+            }
+            fetchLastCrawledBlock();
+        }, 30000);
+        return () => clearInterval(intervalId);
+    }, [isAdmin, address, connectedAddress, page, limit, sortBy, sortOrder]);
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = async (userAddress = null) => {
         setLoading(true);
         setError(null);
         try {
             const baseUrl = `${import.meta.env.VITE_BE_API}/transactions`;
-            const url = isAdmin
+            const url = isAdmin && !userAddress
                 ? `${baseUrl}/all`
-                : `${baseUrl}/user/${address}`;
+                : `${baseUrl}/user/${userAddress || address}`;
 
             const queryParams = new URLSearchParams({
                 page,
@@ -145,10 +157,21 @@ const TransactionHistory = () => {
         );
     }
 
+    const handleTransactionClick = (transactionHash) => {
+        window.open(
+            `https://testnet.bscscan.com/tx/${transactionHash}`,
+            "_blank"
+        );
+    };
+
+    const formatTokenAmount = (amount) => {
+        return parseFloat(parseFloat(amount).toFixed(2)).toString();
+    };
+
     return (
         <div className="container mx-auto bg-white-800 p-4">
             <Typography variant="h4" gutterBottom>
-                {isAdmin ? "All Transactions" : "Your Transactions"}
+                {isAdmin ? "All Transactions" : `Transactions for ${address}`}
             </Typography>
             <Typography variant="body1" gutterBottom>
                 Total Transactions: {totalTransactions}
@@ -208,27 +231,38 @@ const TransactionHistory = () => {
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>From</TableCell>
-                                <TableCell>To</TableCell>
+                                <TableCell>Transaction Hash</TableCell>
                                 <TableCell>Event Type</TableCell>
                                 <TableCell>Block</TableCell>
                                 <TableCell>Amount (ETH)</TableCell>
-                                <TableCell>Gas Used (ETH)</TableCell>
+                                <TableCell>Gas Used (Wei)</TableCell>
                                 <TableCell>Timestamp</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {transactions.map((tx) => (
                                 <TableRow key={tx._id}>
-                                    <TableCell>{tx.fromAddress}</TableCell>
-                                    <TableCell>{tx.toAddress}</TableCell>
+                                    <TableCell>
+                                        <Link
+                                            component="button"
+                                            variant="body2"
+                                            onClick={() =>
+                                                handleTransactionClick(
+                                                    tx.transactionHash
+                                                )
+                                            }
+                                        >
+                                            {tx.transactionHash.slice(0, 6)}...
+                                            {tx.transactionHash.slice(-4)}
+                                        </Link>
+                                    </TableCell>
                                     <TableCell>{tx.eventType}</TableCell>
                                     <TableCell>{tx.blockNumber}</TableCell>
                                     <TableCell>
-                                        {ethers.utils.formatEther(tx.amount)}
+                                        {formatTokenAmount(ethers.utils.formatEther(tx.amount))}
                                     </TableCell>
                                     <TableCell>
-                                        {ethers.utils.formatEther(tx.gasUsed)}
+                                        {tx.gasUsed}
                                     </TableCell>
                                     <TableCell>
                                         {new Date(
