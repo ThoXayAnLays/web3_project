@@ -18,6 +18,10 @@ const Header = () => {
         }
     }
 
+    const formatTokenAmount = (amount) => {
+        return parseFloat(amount).toFixed(2);
+    };
+
     return (
         <header className="bg-gray-800 text-white p-4">
             <div className="container mx-auto flex justify-between items-center">
@@ -35,7 +39,7 @@ const Header = () => {
                     )}
                     {address ? (
                         <>
-                            <span>TokenA: {tokenABalance}</span>
+                            <span>TokenA: {formatTokenAmount(tokenABalance)}</span>
                             <span>NFTB: {nftBBalance}</span>
                             <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
                         </>

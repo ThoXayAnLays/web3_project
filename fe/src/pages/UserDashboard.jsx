@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useWeb3 } from "../contexts/Web3Context";
 import StakingInfo from "../components/StakingInfo";
 import {
@@ -12,7 +12,10 @@ import {
     Typography,
     Checkbox,
     FormControlLabel,
-    ListItemText,
+    Grid,
+    Paper,
+    Box,
+    Divider,
 } from "@mui/material";
 import { ethers } from "ethers";
 import { toast } from "react-toastify";
@@ -40,6 +43,8 @@ const UserDashboard = () => {
     const [selectedNFTsForWithdrawal, setSelectedNFTsForWithdrawal] = useState(
         []
     );
+    const [totalReward, setTotalReward] = useState("0");
+    const [updateTrigger, setUpdateTrigger] = useState(0);
 
     const fixedGasLimit = 900000;
 
@@ -55,6 +60,26 @@ const UserDashboard = () => {
             }
         }
     };
+
+    const fetchTotalReward = useCallback(async () => {
+        if (stakingContract && address) {
+            try {
+                const calculatedReward = await stakingContract.calculateReward(address);
+                const stake = await stakingContract.stakes(address);
+                const pendingReward = stake.pendingReward;
+                const total = calculatedReward.add(pendingReward);
+                setTotalReward(ethers.utils.formatEther(total));
+            } catch (error) {
+                console.error("Error fetching total reward:", error);
+            }
+        }
+    }, [stakingContract, address]);
+
+    useEffect(() => {
+        fetchTotalReward();
+        const interval = setInterval(fetchTotalReward, 30000);
+        return () => clearInterval(interval);
+    }, [fetchTotalReward]);
 
     useEffect(() => {
         if (address && stakingContract) {
@@ -92,7 +117,7 @@ const UserDashboard = () => {
     const fetchOwnedNFTs = async () => {
         try {
             const ownedNFTs = await stakingContract.getOwnedNFTs(address);
-            setOwnedNFTs(ownedNFTs.map(nft => nft.toString()));
+            setOwnedNFTs(ownedNFTs.map((nft) => nft.toString()));
         } catch (error) {
             console.error("Error fetching owned NFTs:", error);
             toast.error("Failed to fetch owned NFTs");
@@ -160,6 +185,7 @@ const UserDashboard = () => {
                 fetchOwnedNFTs();
                 fetchStakedNFTs();
                 fetchRemainingLockTime();
+                setUpdateTrigger((prev) => prev + 1);
             } else {
                 toast.error("Transaction failed. Please try again.");
             }
@@ -195,10 +221,16 @@ const UserDashboard = () => {
 
     const approveAllNFTs = async () => {
         try {
-            const isApprovedForAll = await nftBContract.isApprovedForAll(address, stakingContract.address);
+            const isApprovedForAll = await nftBContract.isApprovedForAll(
+                address,
+                stakingContract.address
+            );
             if (!isApprovedForAll) {
                 await handleTransaction(
-                    nftBContract.setApprovalForAll(stakingContract.address, true),
+                    nftBContract.setApprovalForAll(
+                        stakingContract.address,
+                        true
+                    ),
                     "Approved all NFTs for staking"
                 );
             }
@@ -273,7 +305,9 @@ const UserDashboard = () => {
 
             for (const nftId of selectedNFTsForDeposit) {
                 await handleTransaction(
-                    stakingContract.depositNFT(nftId, { gasLimit: fixedGasLimit }),
+                    stakingContract.depositNFT(nftId, {
+                        gasLimit: fixedGasLimit,
+                    }),
                     `NFT #${nftId} deposited successfully`
                 );
             }
@@ -331,169 +365,215 @@ const UserDashboard = () => {
             "Received 2,000,000 TokenA"
         );
 
-    const totalReward = ethers.utils.formatEther(
-        ethers.utils
-            .parseEther(reward)
-            .add(ethers.utils.parseEther(pendingReward))
-    );
-
     return (
-        <div className="container mx-auto p-4">
+        <Box sx={{ flexGrow: 1, p: 3 }}>
             <Typography variant="h4" gutterBottom>
                 User Dashboard
             </Typography>
-            <StakingInfo />
-            {boostRewardPercentage !== null && (
-                <Typography variant="body1" gutterBottom>
-                    Current Boost Reward Percentage: {boostRewardPercentage}%
-                </Typography>
-            )}
-            <div className="mt-4 space-y-4">
-                <div>
-                    <TextField
-                        label="Amount to Deposit"
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        disabled={loading}
-                    />
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleDeposit}
-                        disabled={
-                            loading ||
-                            !amount ||
-                            Number(amount) <= 0 ||
-                            Number(amount) > Number(tokenABalance)
-                        }
-                    >
-                        Deposit
-                    </Button>
-                </div>
-                <div>
-                    <FormControl fullWidth>
-                        <InputLabel>Select NFTs to Deposit</InputLabel>
-                        <Select
-                            multiple
-                            value={selectedNFTsForDeposit}
-                            onChange={(e) =>
-                                setSelectedNFTsForDeposit(e.target.value)
-                            }
-                            renderValue={(selected) => selected.join(", ")}
-                            disabled={
-                                loading ||
-                                ownedNFTs.length === 0 ||
-                                Number(stakedAmount) <= 0
-                            }
-                        >
-                            {ownedNFTs
-                                .filter((nftId) => !stakedNFTs.includes(nftId))
-                                .map((nftId) => (
-                                    <MenuItem key={nftId} value={nftId}>
-                                        <Checkbox
-                                            checked={
-                                                selectedNFTsForDeposit.indexOf(
-                                                    nftId
-                                                ) > -1
-                                            }
-                                            onChange={() =>
-                                                handleNFTSelectionForDeposit(
-                                                    nftId
-                                                )
-                                            }
-                                        />
-                                        <ListItemText
-                                            primary={`NFT #${nftId}`}
-                                        />
-                                    </MenuItem>
-                                ))}
-                        </Select>
-                    </FormControl>
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        onClick={handleDepositNFTs}
-                        disabled={
-                            loading ||
-                            selectedNFTsForDeposit.length === 0 ||
-                            Number(stakedAmount) <= 0
-                        }
-                    >
-                        Deposit Selected NFTs
-                    </Button>
-                </div>
-                <Button
-                    variant="contained"
-                    color="secondary"
-                    onClick={handleWithdraw}
-                    disabled={
-                        loading ||
-                        Number(stakedAmount) <= 0 ||
-                        remainingLockTime > 0
-                    }
-                >
-                    Withdraw Tokens
-                </Button>
-                <Button
-                    variant="contained"
-                    color="success"
-                    onClick={handleClaimReward}
-                    disabled={loading || Number(totalReward) <= 0}
-                >
-                    Claim Reward
-                </Button>
-                <Button
-                    variant="contained"
-                    color="info"
-                    onClick={handleGetTokenA}
-                    disabled={loading}
-                >
-                    Faucet 2M TokenA
-                </Button>
-                <div>
-                    <Typography variant="h6" gutterBottom>
-                        Staked NFTs
-                    </Typography>
-                    {stakedNFTs.length > 0 ? (
-                        <>
-                            {stakedNFTs.map((nftId) => (
-                                <FormControlLabel
-                                    key={nftId}
-                                    control={
-                                        <Checkbox
-                                            checked={selectedNFTsForWithdrawal.includes(
-                                                nftId
-                                            )}
-                                            onChange={() =>
-                                                handleNFTSelectionForWithdrawal(
-                                                    nftId
-                                                )
-                                            }
-                                        />
-                                    }
-                                    label={`NFT #${nftId}`}
-                                />
-                            ))}
+            <Grid container spacing={3}>
+                <Grid item xs={12} md={5}>
+                    <Paper elevation={3} sx={{ p: 2, height: "100%" }}>
+                        <StakingInfo updateTrigger={updateTrigger} />
+                        {boostRewardPercentage !== null && (
+                            <Typography
+                                variant="body1"
+                                gutterBottom
+                                sx={{ mt: 2 }}
+                            >
+                                Current Boost Reward Percentage:{" "}
+                                {boostRewardPercentage}%
+                            </Typography>
+                        )}
+                        <Divider sx={{ my: 2 }} />
+                        <Grid item xs={12}>
                             <Button
+                                fullWidth
                                 variant="contained"
-                                color="warning"
-                                onClick={handleWithdrawNFTs}
+                                color="secondary"
+                                onClick={handleWithdraw}
                                 disabled={
                                     loading ||
-                                    selectedNFTsForWithdrawal.length === 0
+                                    Number(stakedAmount) <= 0 ||
+                                    remainingLockTime > 0
                                 }
                             >
-                                Withdraw Selected NFTs
+                                Withdraw Tokens
                             </Button>
-                        </>
-                    ) : (
-                        <Typography>No staked NFTs</Typography>
-                    )}
-                </div>
-            </div>
-            {loading && <CircularProgress className="mt-4" />}
-        </div>
+                        </Grid>
+                        <Grid item xs={12} sx={{ mt: 2 }}>
+                        <Button
+                                fullWidth
+                                variant="contained"
+                                color="success"
+                                onClick={handleClaimReward}
+                                disabled={loading || parseFloat(totalReward) <= 0}
+                            >
+                                Claim Reward
+                            </Button>
+                        </Grid>
+                        <Typography variant="h6" gutterBottom>
+                            Staked NFTs
+                        </Typography>
+                        {stakedNFTs.length > 0 ? (
+                            <Grid container spacing={1}>
+                                {stakedNFTs.map((nftId) => (
+                                    <Grid item xs={6} sm={4} key={nftId}>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={selectedNFTsForWithdrawal.includes(
+                                                        nftId
+                                                    )}
+                                                    onChange={() =>
+                                                        handleNFTSelectionForWithdrawal(
+                                                            nftId
+                                                        )
+                                                    }
+                                                    size="small"
+                                                />
+                                            }
+                                            label={`NFT #${nftId}`}
+                                        />
+                                    </Grid>
+                                ))}
+                            </Grid>
+                        ) : (
+                            <Typography>No staked NFTs</Typography>
+                        )}
+                        {stakedNFTs.length > 0 && (
+                            <Grid item xs={12}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    color="warning"
+                                    onClick={handleWithdrawNFTs}
+                                    disabled={
+                                        loading ||
+                                        selectedNFTsForWithdrawal.length === 0
+                                    }
+                                >
+                                    Withdraw Selected NFTs
+                                </Button>
+                            </Grid>
+                        )}
+                    </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={7}>
+                    <Paper elevation={3} sx={{ p: 2 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Staking Actions
+                        </Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Amount to Deposit"
+                                    type="number"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    disabled={loading}
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={handleDeposit}
+                                    disabled={
+                                        loading ||
+                                        !amount ||
+                                        Number(amount) <= 0 ||
+                                        Number(amount) > Number(tokenABalance)
+                                    }
+                                >
+                                    Deposit
+                                </Button>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <FormControl fullWidth>
+                                    <InputLabel>
+                                        Select NFTs to Deposit
+                                    </InputLabel>
+                                    <Select
+                                        multiple
+                                        value={selectedNFTsForDeposit}
+                                        onChange={(e) =>
+                                            setSelectedNFTsForDeposit(
+                                                e.target.value
+                                            )
+                                        }
+                                        renderValue={(selected) =>
+                                            selected.join(", ")
+                                        }
+                                        disabled={
+                                            loading ||
+                                            ownedNFTs.length === 0 ||
+                                            Number(stakedAmount) <= 0
+                                        }
+                                    >
+                                        {ownedNFTs
+                                            .filter(
+                                                (nftId) =>
+                                                    !stakedNFTs.includes(nftId)
+                                            )
+                                            .map((nftId) => (
+                                                <MenuItem
+                                                    key={nftId}
+                                                    value={nftId}
+                                                >
+                                                    <Checkbox
+                                                        checked={
+                                                            selectedNFTsForDeposit.indexOf(
+                                                                nftId
+                                                            ) > -1
+                                                        }
+                                                    />
+                                                    <Typography>
+                                                        NFT #{nftId}
+                                                    </Typography>
+                                                </MenuItem>
+                                            ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    color="secondary"
+                                    onClick={handleDepositNFTs}
+                                    disabled={
+                                        loading ||
+                                        selectedNFTsForDeposit.length === 0 ||
+                                        Number(stakedAmount) <= 0
+                                    }
+                                >
+                                    Deposit Selected NFTs
+                                </Button>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    color="info"
+                                    onClick={handleGetTokenA}
+                                    disabled={loading}
+                                >
+                                    Faucet 2M TokenA
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+                </Grid>
+            </Grid>
+            {loading && (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                    <CircularProgress />
+                </Box>
+            )}
+        </Box>
     );
 };
 
