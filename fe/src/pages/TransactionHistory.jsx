@@ -21,7 +21,12 @@ import {
 import { toast } from "react-toastify";
 
 const TransactionHistory = () => {
-    const { address: connectedAddress, isAdmin, stakingContract, updateBaseAPR } = useWeb3();
+    const {
+        address: connectedAddress,
+        isAdmin,
+        stakingContract,
+        updateBaseAPR,
+    } = useWeb3();
     const { address } = useParams();
     const navigate = useNavigate();
     const [transactions, setTransactions] = useState([]);
@@ -62,9 +67,10 @@ const TransactionHistory = () => {
         setError(null);
         try {
             const baseUrl = `${import.meta.env.VITE_BE_API}/transactions`;
-            const url = isAdmin && !userAddress
-                ? `${baseUrl}/all`
-                : `${baseUrl}/user/${userAddress || address}`;
+            const url =
+                isAdmin && !userAddress
+                    ? `${baseUrl}/all`
+                    : `${baseUrl}/user/${userAddress || address}`;
 
             const queryParams = new URLSearchParams({
                 page,
@@ -89,6 +95,10 @@ const TransactionHistory = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const truncateAddress = (address) => {
+        return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
     const fetchLastCrawledBlock = async () => {
@@ -164,6 +174,17 @@ const TransactionHistory = () => {
         );
     };
 
+    const handleAddressClick = (address) => {
+        window.open(`https://testnet.bscscan.com/address/${address}`, "_blank");
+    };
+
+    const handleBlockClick = (blockNumber) => {
+        window.open(
+            `https://testnet.bscscan.com/block/${blockNumber}`,
+            "_blank"
+        );
+    };
+
     const formatTokenAmount = (amount) => {
         return parseFloat(parseFloat(amount).toFixed(2)).toString();
     };
@@ -202,7 +223,7 @@ const TransactionHistory = () => {
             )}
             <div className="mb-4 flex items-center space-x-2">
                 <TextField
-                    label="Search"
+                    label="Search (Address/Block/Hash)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -222,59 +243,85 @@ const TransactionHistory = () => {
                     {sortOrder === "asc" ? "Ascending" : "Descending"}
                 </Button>
             </div>
-            {loading ? (
-                <CircularProgress />
-            ) : error ? (
-                <Typography color="error">{error}</Typography>
-            ) : (
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Transaction Hash</TableCell>
-                                <TableCell>Event Type</TableCell>
-                                <TableCell>Block</TableCell>
-                                <TableCell>Amount (ETH)</TableCell>
-                                <TableCell>Gas Used (Wei)</TableCell>
-                                <TableCell>Timestamp</TableCell>
+            <TableContainer component={Paper}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Transaction Hash</TableCell>
+                            <TableCell>Event Type</TableCell>
+                            <TableCell>Block</TableCell>
+                            <TableCell>From</TableCell>
+                            <TableCell>To</TableCell>
+                            <TableCell>Amount (ETH)</TableCell>
+                            <TableCell>Gas Used (Wei)</TableCell>
+                            <TableCell>Timestamp</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {transactions.map((tx) => (
+                            <TableRow key={tx._id}>
+                                <TableCell>
+                                    <Link
+                                        component="button"
+                                        variant="body2"
+                                        onClick={() =>
+                                            handleTransactionClick(
+                                                tx.transactionHash
+                                            )
+                                        }
+                                    >
+                                        {tx.transactionHash.slice(0, 6)}...
+                                        {tx.transactionHash.slice(-4)}
+                                    </Link>
+                                </TableCell>
+                                <TableCell>{tx.eventType}</TableCell>
+                                <TableCell>
+                                    <Link
+                                        component="button"
+                                        variant="body2"
+                                        onClick={() =>
+                                            handleBlockClick(tx.blockNumber)
+                                        }
+                                    >
+                                        {tx.blockNumber}
+                                    </Link>
+                                </TableCell>
+                                <TableCell>
+                                    <Link
+                                        component="button"
+                                        variant="body2"
+                                        onClick={() =>
+                                            handleAddressClick(tx.fromAddress)
+                                        }
+                                    >
+                                        {truncateAddress(tx.fromAddress)}
+                                    </Link>
+                                </TableCell>
+                                <TableCell>
+                                    <Link
+                                        component="button"
+                                        variant="body2"
+                                        onClick={() =>
+                                            handleAddressClick(tx.toAddress)
+                                        }
+                                    >
+                                        {truncateAddress(tx.toAddress)}
+                                    </Link>
+                                </TableCell>
+                                <TableCell>
+                                    {formatTokenAmount(
+                                        ethers.utils.formatEther(tx.amount)
+                                    )}
+                                </TableCell>
+                                <TableCell>{tx.gasUsed}</TableCell>
+                                <TableCell>
+                                    {new Date(tx.timestamp).toLocaleString()}
+                                </TableCell>
                             </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {transactions.map((tx) => (
-                                <TableRow key={tx._id}>
-                                    <TableCell>
-                                        <Link
-                                            component="button"
-                                            variant="body2"
-                                            onClick={() =>
-                                                handleTransactionClick(
-                                                    tx.transactionHash
-                                                )
-                                            }
-                                        >
-                                            {tx.transactionHash.slice(0, 6)}...
-                                            {tx.transactionHash.slice(-4)}
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell>{tx.eventType}</TableCell>
-                                    <TableCell>{tx.blockNumber}</TableCell>
-                                    <TableCell>
-                                        {formatTokenAmount(ethers.utils.formatEther(tx.amount))}
-                                    </TableCell>
-                                    <TableCell>
-                                        {tx.gasUsed}
-                                    </TableCell>
-                                    <TableCell>
-                                        {new Date(
-                                            tx.timestamp
-                                        ).toLocaleString()}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            )}
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
             <div className="mt-4 flex justify-between items-center">
                 <div>
                     <Button

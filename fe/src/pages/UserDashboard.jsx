@@ -405,16 +405,6 @@ const UserDashboard = () => {
                 <Grid item xs={12} md={5}>
                     <Paper elevation={3} sx={{ p: 2, height: "100%" }}>
                         <StakingInfo updateTrigger={updateTrigger} />
-                        {boostRewardPercentage !== null && (
-                            <Typography
-                                variant="body1"
-                                gutterBottom
-                                sx={{ mt: 2 }}
-                            >
-                                Current Boost Reward Percentage:{" "}
-                                {boostRewardPercentage}%
-                            </Typography>
-                        )}
                         <Divider sx={{ my: 2 }} />
                         <Grid item xs={12}>
                             <Button

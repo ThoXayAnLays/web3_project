@@ -1,26 +1,40 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useWeb3 } from '../contexts/Web3Context'
-import { Button, Typography } from '@mui/material'
+import { Button, Typography, Menu, MenuItem } from '@mui/material'
 
 const Header = () => {
-    const { address, isAdmin, connectWallet, provider, tokenABalance, nftBBalance, baseAPR } = useWeb3()
+    const { address, isAdmin, connectWallet, disconnectWallet, isConnected, tokenABalance, nftBBalance, baseAPR } = useWeb3()
+    const [anchorEl, setAnchorEl] = useState(null)
 
-    const handleConnect = async () => {
+    const handleClick = (event) => {
+        setAnchorEl(event.currentTarget)
+    }
+
+    const handleClose = () => {
+        setAnchorEl(null)
+    }
+
+    const handleConnect = async (connectorType) => {
+        handleClose()
         try {
-            if (window.ethereum) {
-                await connectWallet()
-            } else {
-                console.error('No Ethereum provider available')
-            }
+            await connectWallet(connectorType)
         } catch (error) {
             console.error('Error connecting wallet:', error)
         }
     }
 
+    const handleDisconnect = async () => {
+        try {
+            await disconnectWallet()
+        } catch (error) {
+            console.error('Error disconnecting wallet:', error)
+        }
+    }
+
     const formatTokenAmount = (amount) => {
-        return parseFloat(amount).toFixed(2);
-    };
+        return parseFloat(amount).toFixed(2)
+    }
 
     return (
         <header className="bg-gray-800 text-white p-4">
@@ -37,16 +51,29 @@ const Header = () => {
                             Base APR: {baseAPR}%
                         </Typography>
                     )}
-                    {address ? (
+                    {isConnected ? (
                         <>
                             <span>TokenA: {formatTokenAmount(tokenABalance)}</span>
                             <span>NFTB: {nftBBalance}</span>
                             <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
+                            <Button variant="contained" color="secondary" onClick={handleDisconnect}>
+                                Disconnect
+                            </Button>
                         </>
                     ) : (
-                        <Button variant="contained" color="primary" onClick={handleConnect}>
-                            Connect Wallet
-                        </Button>
+                        <>
+                            <Button variant="contained" color="primary" onClick={handleClick}>
+                                Connect Wallet
+                            </Button>
+                            <Menu
+                                anchorEl={anchorEl}
+                                open={Boolean(anchorEl)}
+                                onClose={handleClose}
+                            >
+                                <MenuItem onClick={() => handleConnect('injected')}>MetaMask</MenuItem>
+                                <MenuItem onClick={() => handleConnect('walletconnect')}>WalletConnect</MenuItem>
+                            </Menu>
+                        </>
                     )}
                 </div>
             </div>

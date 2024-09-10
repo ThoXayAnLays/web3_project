@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { ethers } from 'ethers'
+import EthereumProvider from '@walletconnect/ethereum-provider'
 import { toast } from 'react-toastify'
 import UpgradeableTokenAJson from '../contracts/UpgradeableTokenA.json'
 import UpgradeableNFTBJson from '../contracts/UpgradeableNFTB.json'
@@ -10,9 +11,11 @@ const Web3Context = createContext()
 
 export const useWeb3 = () => useContext(Web3Context)
 
+const NETWORK_ID = parseInt(import.meta.env.VITE_TESTNET_CHAIN_ID)
+
 export const Web3Provider = ({ children }) => {
     const [provider, setProvider] = useState(null)
-    const [signer, setSigner] = useState(null)
+    const [wcProvider, setWcProvider] = useState(null)
     const [address, setAddress] = useState(null)
     const [isAdmin, setIsAdmin] = useState(false)
     const [tokenAContract, setTokenAContract] = useState(null)
@@ -21,162 +24,156 @@ export const Web3Provider = ({ children }) => {
     const [tokenABalance, setTokenABalance] = useState('0')
     const [nftBBalance, setNFTBBalance] = useState('0')
     const [baseAPR, setBaseAPR] = useState(null)
-    const [boostRewardPercentage, setBoostRewardPercentage] = useState(null)
     const [isCorrectNetwork, setIsCorrectNetwork] = useState(true)
-    const [isConnected, setIsConnected] = useState(false)
     const [chainId, setChainId] = useState(null)
 
-    const connectWallet = useCallback(async () => {
-        if (window.ethereum) {
-            try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum)
-                await provider.send('eth_requestAccounts', []);
-                const signer = provider.getSigner()
-                const address = await signer.getAddress()
-                setProvider(provider)
-                setSigner(signer)
-                setAddress(address)
-                setIsAdmin(address.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS.toLowerCase())
-                setIsConnected(true)
-
-                
-                const tokenA = new ethers.Contract(contractAddresses.UpgradeableTokenA, UpgradeableTokenAJson.abi, signer)
-                const nftB = new ethers.Contract(contractAddresses.UpgradeableNFTB, UpgradeableNFTBJson.abi, signer)
-                const staking = new ethers.Contract(contractAddresses.UpgradeableStaking, UpgradeableStakingJson.abi, signer)
-
-                setTokenAContract(tokenA)
-                setNFTBContract(nftB)
-                setStakingContract(staking)
-
-                await updateBalances(address, tokenA, nftB)
-                await updateBaseAPR(staking)
-                await updateBoostRewardPercentage(staking)
-
-                // Check network
-                const network = await provider.getNetwork()
-                console.log("ChainId: ", network.chainId);
-                setChainId(network.chainId)
-                const isCorrect = network.chainId === parseInt(import.meta.env.VITE_TESTNET_CHAIN_ID)
-                setIsCorrectNetwork(isCorrect)
-                if (!isCorrect) {
-                    toast.error('Please connect to BSC Testnet')
+    const connectWallet = async (connectorType) => {
+        try {
+            let ethersProvider;
+            if (connectorType === 'injected') {
+                if (typeof window.ethereum !== 'undefined') {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
+                } else {
+                    throw new Error("MetaMask not detected");
                 }
-            } catch (error) {
-                console.error('Error connecting wallet:', error)
-                toast.error('Failed to connect wallet')
-                setIsConnected(false)
+            } else if (connectorType === 'walletconnect') {
+                const wcProviderInstance = await EthereumProvider.init({
+                    projectId: import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID,
+                    chains: [NETWORK_ID],
+                    showQrModal: true,
+                    qrModalOptions: { themeMode: "dark" }
+                });
+
+                await wcProviderInstance.enable();
+                ethersProvider = new ethers.providers.Web3Provider(wcProviderInstance);
+                setWcProvider(wcProviderInstance);
+
+                wcProviderInstance.on('disconnect', () => {
+                    resetState();
+                });
+            } else {
+                throw new Error("Invalid connector type");
             }
-        } else {
-            toast.error('Please install MetaMask to use this dApp')
+
+            setProvider(ethersProvider);
+
+            const signer = ethersProvider.getSigner();
+            const address = await signer.getAddress();
+            setAddress(address);
+
+            const network = await ethersProvider.getNetwork();
+            setChainId(network.chainId);
+            setIsCorrectNetwork(network.chainId === NETWORK_ID);
+
+            setIsAdmin(address.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS.toLowerCase());
+
+            await initializeContracts(signer);
+
+            toast.success('Wallet connected successfully');
+        } catch (error) {
+            console.error('Error connecting wallet:', error);
+            toast.error('Failed to connect wallet: ' + error.message);
         }
-    }, [])
+    }
+
+    const initializeContracts = async (signer) => {
+        if (contractAddresses.UpgradeableTokenA && contractAddresses.UpgradeableNFTB && contractAddresses.UpgradeableStaking) {
+            const tokenA = new ethers.Contract(contractAddresses.UpgradeableTokenA, UpgradeableTokenAJson.abi, signer)
+            const nftB = new ethers.Contract(contractAddresses.UpgradeableNFTB, UpgradeableNFTBJson.abi, signer)
+            const staking = new ethers.Contract(contractAddresses.UpgradeableStaking, UpgradeableStakingJson.abi, signer)
+
+            setTokenAContract(tokenA);
+            setNFTBContract(nftB);
+            setStakingContract(staking);
+
+            await updateBalances(await signer.getAddress(), tokenA, nftB);
+            await updateBaseAPR(staking);
+        } else {
+            console.error('Contract addresses are not properly defined');
+            toast.error('Contract addresses are missing. Please check your configuration.');
+        }
+    }
+
+    const disconnectWallet = async () => {
+        if (wcProvider) {
+            try {
+                await wcProvider.disconnect();
+            } catch (error) {
+                console.error('Error disconnecting WalletConnect:', error);
+            }
+        }
+        resetState();
+        toast.success('Wallet disconnected');
+    }
+
+    const resetState = () => {
+        setProvider(null);
+        setWcProvider(null);
+        setAddress(null);
+        setIsAdmin(false);
+        setTokenAContract(null);
+        setNFTBContract(null);
+        setStakingContract(null);
+        setTokenABalance('0');
+        setNFTBBalance('0');
+        setBaseAPR(null);
+        setChainId(null);
+        setIsCorrectNetwork(true);
+    }
 
     const updateBalances = async (address, tokenA, nftB) => {
         try {
-            const tokenABalance = await tokenA.balanceOf(address)
-            setTokenABalance(ethers.utils.formatEther(tokenABalance))
+            if (tokenA && nftB) {
+                const tokenABalance = await tokenA.balanceOf(address);
+                setTokenABalance(ethers.utils.formatEther(tokenABalance));
 
-            const nftBBalance = await nftB.balanceOf(address)
-            setNFTBBalance(nftBBalance.toString())
+                const nftBBalance = await nftB.balanceOf(address);
+                setNFTBBalance(nftBBalance.toString());
+            }
         } catch (error) {
-            console.error('Error updating balances:', error)
+            console.error('Error updating balances:', error);
         }
     }
 
     const updateBaseAPR = async (staking) => {
         try {
-            const apr = await staking.baseAPR()
-            console.log("Base APR: ", apr.toNumber() / 100);
-            setBaseAPR(apr.toNumber() / 100)
-        } catch (error) {
-            console.error('Error fetching base APR:', error)
-        }
-    }
-
-    const updateBoostRewardPercentage = async (staking) => {
-        try {
-            if (staking.boostRewardPercentage) {
-                const boost = await staking.boostRewardPercentage()
-                console.log("Boost percentage: ", boost.toNumber() / 100);
-                setBoostRewardPercentage(boost.toNumber() / 100)
-            } else {
-                setBoostRewardPercentage(null)
+            if (staking) {
+                const apr = await staking.baseAPR();
+                setBaseAPR(apr.toNumber() / 100);
             }
         } catch (error) {
-            console.error('Error fetching boost reward percentage:', error)
-            setBoostRewardPercentage(null)
+            console.error('Error fetching base APR:', error);
         }
     }
 
     useEffect(() => {
-        const handleAccountsChanged = async (accounts) => {
-            if (accounts.length === 0) {
-                setIsConnected(false)
-                setAddress(null)
-                setSigner(null)
-                setIsAdmin(false)
-                toast.info('Please connect your wallet')
+        const handleaddresssChanged = (addresss) => {
+            if (addresss.length > 0) {
+                setAddress(addresss[0]);
             } else {
-                await connectWallet()
+                resetState();
             }
-        }
+        };
 
         const handleChainChanged = () => {
-            window.location.reload()
-        }
+            window.location.reload();
+        };
 
         if (window.ethereum) {
-            window.ethereum.on('accountsChanged', handleAccountsChanged)
-            window.ethereum.on('chainChanged', handleChainChanged)
-
-            // Check if already connected
-            window.ethereum.request({ method: 'eth_accounts' })
-                .then(accounts => {
-                    if (accounts.length > 0) {
-                        connectWallet()
-                    }
-                })
+            window.ethereum.on('addresssChanged', handleaddresssChanged);
+            window.ethereum.on('chainChanged', handleChainChanged);
         }
 
         return () => {
             if (window.ethereum) {
-                window.ethereum.removeListener('accountsChanged', handleAccountsChanged)
-                window.ethereum.removeListener('chainChanged', handleChainChanged)
+                window.ethereum.removeListener('addresssChanged', handleaddresssChanged);
+                window.ethereum.removeListener('chainChanged', handleChainChanged);
             }
-        }
-    }, [connectWallet, address])
+        };
+    }, []);
 
-    const checkIfWalletIsConnected = useCallback(async () => {
-        if (window.ethereum) {
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' })
-            if (accounts.length > 0) {
-                await connectWallet()
-            }
-        }
-    }, [connectWallet])
-
-    useEffect(() => {
-        const checkIfWalletIsConnected = async () => {
-            if (window.ethereum) {
-                const provider = new ethers.providers.Web3Provider(window.ethereum)
-                setProvider(provider)
-                const accounts = await provider.listAccounts()
-                if (accounts.length > 0) {
-                    await connectWallet()
-                }
-            }
-        }
-
-        checkIfWalletIsConnected()
-    }, [connectWallet])
-
-    useEffect(() => {
-        checkIfWalletIsConnected()
-    }, [checkIfWalletIsConnected])
-
-    const value = {
-        provider,
-        signer,
+    const value = useMemo(() => ({
         address,
         isAdmin,
         tokenAContract,
@@ -187,12 +184,12 @@ export const Web3Provider = ({ children }) => {
         baseAPR,
         chainId,
         isCorrectNetwork,
-        boostRewardPercentage,
-        isConnected,
+        isConnected: !!address,
         connectWallet,
+        disconnectWallet,
         updateBalances,
         updateBaseAPR,
-    }
+    }), [address, isAdmin, tokenAContract, nftBContract, stakingContract, tokenABalance, nftBBalance, baseAPR, chainId, isCorrectNetwork]);
 
-    return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>
+    return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
 }

@@ -24,6 +24,8 @@ exports.getUserTransactions = async (req, res) => {
                       { fromAddress: { $regex: search, $options: "i" } },
                       { toAddress: { $regex: search, $options: "i" } },
                       { eventType: { $regex: search, $options: "i" } },
+                      { blockNumber: { $regex: search, $options: "i" } },
+                      { transactionHash: { $regex: search, $options: "i" } },
                   ],
               }
             : {};
@@ -69,6 +71,8 @@ exports.getAllTransactions = async (req, res) => {
                       { fromAddress: { $regex: search, $options: "i" } },
                       { toAddress: { $regex: search, $options: "i" } },
                       { eventType: { $regex: search, $options: "i" } },
+                      { blockNumber: { $regex: search, $options: "i" } },
+                      { transactionHash: { $regex: search, $options: "i" } },
                   ],
               }
             : {};
@@ -84,7 +88,6 @@ exports.getAllTransactions = async (req, res) => {
         });
     }
 };
-
 
 exports.getLastCrawledBlock = async (req, res) => {
     try {
