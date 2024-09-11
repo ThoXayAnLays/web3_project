@@ -27,7 +27,7 @@ const UserDashboard = () => {
         nftBContract,
         stakingContract,
         updateBalances,
-        boostRewardPercentage,
+        isConnected,
         provider,
     } = useWeb3();
     const [amount, setAmount] = useState("");
@@ -404,7 +404,10 @@ const UserDashboard = () => {
             <Grid container spacing={3}>
                 <Grid item xs={12} md={5}>
                     <Paper elevation={3} sx={{ p: 2, height: "100%" }}>
-                        <StakingInfo updateTrigger={updateTrigger} />
+                        <StakingInfo
+                            updateTrigger={updateTrigger}
+                            isConnected={isConnected}
+                        />
                         <Divider sx={{ my: 2 }} />
                         <Grid item xs={12}>
                             <Button
@@ -414,6 +417,7 @@ const UserDashboard = () => {
                                 onClick={handleWithdraw}
                                 disabled={
                                     loading ||
+                                    !isConnected ||
                                     Number(stakedAmount) <= 0 ||
                                     remainingLockTime > 0
                                 }
@@ -428,7 +432,9 @@ const UserDashboard = () => {
                                 color="success"
                                 onClick={handleClaimReward}
                                 disabled={
-                                    loading || parseFloat(totalReward) <= 0
+                                    loading || 
+                                    !isConnected ||
+                                    parseFloat(totalReward) <= 0
                                 }
                             >
                                 Claim Reward
@@ -472,6 +478,7 @@ const UserDashboard = () => {
                                     onClick={handleWithdrawNFTs}
                                     disabled={
                                         loading ||
+                                        !isConnected ||
                                         selectedNFTsForWithdrawal.length === 0
                                     }
                                 >
@@ -507,6 +514,7 @@ const UserDashboard = () => {
                                     disabled={
                                         loading ||
                                         !amount ||
+                                        !isConnected ||
                                         Number(amount) <= 0 ||
                                         Number(amount) > Number(tokenABalance)
                                     }
@@ -532,6 +540,7 @@ const UserDashboard = () => {
                                         }
                                         disabled={
                                             loading ||
+                                            !isConnected ||
                                             ownedNFTs.length === 0 ||
                                             Number(stakedAmount) <= 0
                                         }
@@ -569,6 +578,7 @@ const UserDashboard = () => {
                                     onClick={handleDepositNFTs}
                                     disabled={
                                         loading ||
+                                        !isConnected ||
                                         selectedNFTsForDeposit.length === 0 ||
                                         Number(stakedAmount) <= 0
                                     }
@@ -582,7 +592,10 @@ const UserDashboard = () => {
                                     variant="contained"
                                     color="info"
                                     onClick={handleGetTokenA}
-                                    disabled={loading}
+                                    disabled={
+                                        !isConnected ||
+                                        loading
+                                    }
                                 >
                                     Faucet 2M TokenA
                                 </Button>

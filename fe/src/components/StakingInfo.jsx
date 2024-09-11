@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 import { Card, CardContent, Typography } from "@mui/material";
 
 const StakingInfo = ({ updateTrigger }) => {
-    const { address, stakingContract } = useWeb3();
+    const { address, stakingContract, isConnected } = useWeb3();
     const [stakingInfo, setStakingInfo] = useState(null);
     const [error, setError] = useState(null);
     const [remainingLockTime, setRemainingLockTime] = useState(0);
@@ -14,50 +14,66 @@ const StakingInfo = ({ updateTrigger }) => {
     };
 
     const fetchStakingInfo = useCallback(async () => {
-        if (stakingContract && address) {
+        if (stakingContract && address && isConnected) {
             try {
                 setError(null);
 
                 const stake = await stakingContract.stakes(address);
                 const baseAPR = await stakingContract.baseAPR();
                 const nftBonusAPR = await stakingContract.nftBonusAPR();
-                const calculatedReward = await stakingContract.calculateReward(address);
-                const effectiveAPR = baseAPR.add(nftBonusAPR.mul(stake.nftCount));
-                const lockTime = await stakingContract.getRemainingLockTime(address);
+                const calculatedReward = await stakingContract.calculateReward(
+                    address
+                );
+                const effectiveAPR = baseAPR.add(
+                    nftBonusAPR.mul(stake.nftCount)
+                );
+                const lockTime = await stakingContract.getRemainingLockTime(
+                    address
+                );
 
                 const pendingReward = stake.pendingReward;
                 const totalReward = calculatedReward.add(pendingReward);
 
                 setStakingInfo({
-                    stakedAmount: formatTokenAmount(ethers.utils.formatEther(stake.amount)),
+                    stakedAmount: formatTokenAmount(
+                        ethers.utils.formatEther(stake.amount)
+                    ),
                     nftCount: stake.nftCount.toString(),
                     effectiveAPR: effectiveAPR.toNumber() / 100,
-                    totalReward: formatTokenAmount(ethers.utils.formatEther(totalReward)),
+                    totalReward: formatTokenAmount(
+                        ethers.utils.formatEther(totalReward)
+                    ),
                 });
                 setRemainingLockTime(lockTime.toNumber());
             } catch (error) {
                 console.error("Error fetching staking info:", error);
-                setError("Failed to fetch staking information. Please try again later.");
+                setError(
+                    "Failed to fetch staking information. Please try again later."
+                );
             }
+        } else if (!isConnected) {
+            setStakingInfo(null);
+            setError(null);
+            setRemainingLockTime(0);
         }
-    }, [stakingContract, address]);
+    }, [stakingContract, address, isConnected]);
 
     useEffect(() => {
         fetchStakingInfo();
-        const fetchInterval = setInterval(fetchStakingInfo, 1000); 
+        const fetchInterval = setInterval(fetchStakingInfo, 1000);
 
         return () => clearInterval(fetchInterval);
     }, [fetchStakingInfo, updateTrigger]);
 
     useEffect(() => {
         let intervalId;
-        if (remainingLockTime > 0) {
+        if (remainingLockTime > 0 && isConnected) {
             intervalId = setInterval(() => {
                 setRemainingLockTime((prevTime) => Math.max(0, prevTime - 1));
             }, 1000);
         }
         return () => clearInterval(intervalId);
-    }, [remainingLockTime]);
+    }, [remainingLockTime, isConnected]);
 
     const formatTime = (seconds) => {
         if (seconds <= 0) return "Unlocked";
@@ -67,6 +83,21 @@ const StakingInfo = ({ updateTrigger }) => {
         const remainingSeconds = seconds % 60;
         return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
     };
+
+    if (!isConnected) {
+        return (
+            <Card>
+                <CardContent>
+                    <Typography variant="h5" component="div" gutterBottom>
+                        Staking Information
+                    </Typography>
+                    <Typography>
+                        Please connect your wallet to view staking information.
+                    </Typography>
+                </CardContent>
+            </Card>
+        );
+    }
 
     if (error) {
         return (

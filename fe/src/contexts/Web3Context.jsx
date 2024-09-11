@@ -70,6 +70,9 @@ export const Web3Provider = ({ children }) => {
 
             await initializeContracts(signer);
 
+            localStorage.setItem('walletConnected', 'true');
+            localStorage.setItem('connectorType', connectorType);
+
             toast.success('Wallet connected successfully');
         } catch (error) {
             console.error('Error connecting wallet:', error);
@@ -104,6 +107,8 @@ export const Web3Provider = ({ children }) => {
             }
         }
         resetState();
+        localStorage.removeItem('walletConnected');
+        localStorage.removeItem('connectorType');
         toast.success('Wallet disconnected');
     }
 
@@ -148,9 +153,15 @@ export const Web3Provider = ({ children }) => {
     }
 
     useEffect(() => {
-        const handleaddresssChanged = (addresss) => {
-            if (addresss.length > 0) {
-                setAddress(addresss[0]);
+        const handleAccountsChanged = async (accounts) => {
+            if (accounts.length > 0) {
+                const newAddress = accounts[0];
+                setAddress(newAddress);
+                setIsAdmin(newAddress.toLowerCase() === import.meta.env.VITE_ADMIN_ADDRESS.toLowerCase());
+                if (provider) {
+                    const signer = provider.getSigner();
+                    await initializeContracts(signer);
+                }
             } else {
                 resetState();
             }
@@ -161,13 +172,24 @@ export const Web3Provider = ({ children }) => {
         };
 
         if (window.ethereum) {
-            window.ethereum.on('addresssChanged', handleaddresssChanged);
+            window.ethereum.on('accountsChanged', handleAccountsChanged);
             window.ethereum.on('chainChanged', handleChainChanged);
         }
 
+        // Check if wallet was previously connected
+        const checkPreviousConnection = async () => {
+            const wasConnected = localStorage.getItem('walletConnected');
+            const connectorType = localStorage.getItem('connectorType');
+            if (wasConnected === 'true' && connectorType) {
+                await connectWallet(connectorType);
+            }
+        };
+
+        checkPreviousConnection();
+
         return () => {
             if (window.ethereum) {
-                window.ethereum.removeListener('addresssChanged', handleaddresssChanged);
+                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
                 window.ethereum.removeListener('chainChanged', handleChainChanged);
             }
         };

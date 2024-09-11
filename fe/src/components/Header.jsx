@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useWeb3 } from '../contexts/Web3Context'
 import { Button, Typography, Menu, MenuItem } from '@mui/material'
 
 const Header = () => {
-    const { address, isAdmin, connectWallet, disconnectWallet, isConnected, tokenABalance, nftBBalance, baseAPR } = useWeb3()
+    const { address, isAdmin, connectWallet, disconnectWallet, isConnected, tokenABalance, nftBBalance, baseAPR, stakingContract  } = useWeb3()
     const [anchorEl, setAnchorEl] = useState(null)
+    const [localBaseAPR, setLocalBaseAPR] = useState(baseAPR)
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget)
@@ -32,6 +33,20 @@ const Header = () => {
         }
     }
 
+    useEffect(() => {
+        const fetchAPR = async () => {
+            if (stakingContract) {
+                const apr = await stakingContract.baseAPR();
+                setLocalBaseAPR(apr.toNumber() / 100);
+            }
+        };
+
+        fetchAPR();
+        const interval = setInterval(fetchAPR, 10000);
+
+        return () => clearInterval(interval);
+    }, [stakingContract]);
+
     const formatTokenAmount = (amount) => {
         return parseFloat(amount).toFixed(2)
     }
@@ -46,9 +61,9 @@ const Header = () => {
                     </ul>
                 </nav>
                 <div className="flex items-center space-x-4">
-                    {baseAPR !== null && (
+                    {localBaseAPR !== null && (
                         <Typography variant="body2" className="text-yellow-400">
-                            Base APR: {baseAPR}%
+                            Base APR: {localBaseAPR}%
                         </Typography>
                     )}
                     {isConnected ? (
