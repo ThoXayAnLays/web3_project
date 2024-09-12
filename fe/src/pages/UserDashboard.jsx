@@ -49,25 +49,21 @@ const UserDashboard = () => {
 
     const fixedGasLimit = 900000;
 
-    const fetchRemainingLockTime = async () => {
+    const fetchRemainingLockTime = useCallback(async () => {
         if (address && stakingContract) {
             try {
-                const lockTime = await stakingContract.getRemainingLockTime(
-                    address
-                );
+                const lockTime = await stakingContract.getRemainingLockTime(address);
                 setRemainingLockTime(lockTime.toNumber());
             } catch (error) {
                 console.error("Error fetching remaining lock time:", error);
             }
         }
-    };
+    }, [address, stakingContract]);
 
     const fetchTotalReward = useCallback(async () => {
         if (stakingContract && address) {
             try {
-                const calculatedReward = await stakingContract.calculateReward(
-                    address
-                );
+                const calculatedReward = await stakingContract.calculateReward(address);
                 const stake = await stakingContract.stakes(address);
                 const pendingReward = stake.pendingReward;
                 const total = calculatedReward.add(pendingReward);
@@ -79,26 +75,16 @@ const UserDashboard = () => {
     }, [stakingContract, address]);
 
     useEffect(() => {
-        fetchTotalReward();
-        const interval = setInterval(fetchTotalReward, 30000);
-        return () => clearInterval(interval);
-    }, [fetchTotalReward]);
-
-    useEffect(() => {
         if (address && stakingContract) {
             fetchRemainingLockTime();
-            const interval = setInterval(fetchRemainingLockTime, 60000); // Update every minute
+            fetchTotalReward();
+            const interval = setInterval(() => {
+                fetchRemainingLockTime();
+                fetchTotalReward();
+            }, 30000);
             return () => clearInterval(interval);
         }
-
-        const fetchMintedNFTCount = async () => {
-            if (stakingContract && address) {
-                const stake = await stakingContract.stakes(address);
-                setMintedNFTCount(stake.mintedNFTCount.toNumber());
-            }
-        };
-        fetchMintedNFTCount();
-    }, [stakingContract, address]);
+    }, [address, stakingContract, fetchRemainingLockTime, fetchTotalReward]);
 
     const formatTime = (seconds) => {
         const days = Math.floor(seconds / (3600 * 24));
@@ -110,15 +96,10 @@ const UserDashboard = () => {
     const fetchTokenARemaining = useCallback(async () => {
         if (tokenAContract) {
             try {
-                const contractBalance = await tokenAContract.balanceOf(
-                    tokenAContract.address
-                );
+                const contractBalance = await tokenAContract.balanceOf(tokenAContract.address);
                 setTokenARemaining(ethers.utils.formatEther(contractBalance));
             } catch (error) {
-                console.error(
-                    "Error fetching Token A remaining balance:",
-                    error
-                );
+                console.error("Error fetching Token A remaining balance:", error);
             }
         }
     }, [tokenAContract]);
@@ -132,13 +113,7 @@ const UserDashboard = () => {
             fetchReward();
             fetchTokenARemaining();
         }
-    }, [
-        address,
-        tokenAContract,
-        nftBContract,
-        stakingContract,
-        fetchTokenARemaining,
-    ]);
+    }, [address, tokenAContract, nftBContract, stakingContract, fetchTokenARemaining]);
 
     const fetchOwnedNFTs = async () => {
         try {

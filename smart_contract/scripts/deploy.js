@@ -1,105 +1,61 @@
-const hre = require("hardhat");
-const fs = require("fs");
 const path = require("path");
+const { ethers } = require("hardhat");
+const fs = require("fs");
 
 async function main() {
-    const [deployer] = await hre.ethers.getSigners();
-    console.log("Deploying contracts with the account:", deployer.address);
+    if (network.name === "hardhat") {
+        console.warn(
+            "You are trying to deploy a contract to the Hardhat Network, which" +
+                "gets automatically created and destroyed every time. Use the Hardhat" +
+                " option '--network localhost'"
+        );
+    }
+
+    const [deployer] = await ethers.getSigners();
+    console.log(
+        "Deploying the contracts with the account:",
+        await deployer.getAddress()
+    );
 
     try {
-        // Deploy UpgradeableTokenA
-        console.log("Deploying UpgradeableTokenA...");
-        const UpgradeableTokenA = await hre.ethers.getContractFactory(
-            "UpgradeableTokenA"
-        );
-        const upgradeableTokenA = await hre.upgrades.deployProxy(
-            UpgradeableTokenA,
-            [],
-            { initializer: "initialize" }
-        );
-        await upgradeableTokenA.deployed();
-        console.log(
-            "UpgradeableTokenA proxy address:",
-            upgradeableTokenA.address
-        );
+        // Deploy TokenA
+        console.log("Deploying TokenA...");
+        const TokenA = await ethers.getContractFactory("TokenA");
+        const tokenA = await TokenA.deploy();
+        await tokenA.deployed();
+        console.log("Token A address: ", tokenA.address);
 
-        const tokenAImplementationAddress =
-            await hre.upgrades.erc1967.getImplementationAddress(
-                upgradeableTokenA.address
-            );
-        console.log(
-            "UpgradeableTokenA implementation address:",
-            tokenAImplementationAddress
-        );
+        // Deploy NFTB
+        console.log("Deploying NFTB...");
+        const NFTB = await ethers.getContractFactory("NFTB");
+        const nftB = await NFTB.deploy();
+        await nftB.deployed();
+        console.log("NFT B address: ", nftB.address);
 
-        // Deploy UpgradeableNFTB
-        console.log("Deploying UpgradeableNFTB...");
-        const UpgradeableNFTB = await hre.ethers.getContractFactory(
-            "UpgradeableNFTB"
-        );
-        const upgradeableNFTB = await hre.upgrades.deployProxy(
-            UpgradeableNFTB,
-            [],
-            { initializer: "initialize" }
-        );
-        await upgradeableNFTB.deployed();
-        console.log("UpgradeableNFTB proxy address:", upgradeableNFTB.address);
+        // Deploy Staking
+        console.log("Deploying Staking...");
+        const Staking = await ethers.getContractFactory("Staking");
+        const staking = await Staking.deploy(tokenA.address, nftB.address);
 
-        const nftBImplementationAddress =
-            await hre.upgrades.erc1967.getImplementationAddress(
-                upgradeableNFTB.address
-            );
-        console.log(
-            "UpgradeableNFTB implementation address:",
-            nftBImplementationAddress
-        );
+        // Wait for the transaction to be mined
+        const receipt = await staking.deployTransaction.wait();
 
-        // Deploy UpgradeableStaking
-        console.log("Deploying UpgradeableStaking...");
-        const UpgradeableStaking = await hre.ethers.getContractFactory(
-            "UpgradeableStaking"
-        );
-        const upgradeableStaking = await hre.upgrades.deployProxy(
-            UpgradeableStaking,
-            [upgradeableTokenA.address, upgradeableNFTB.address],
-            { initializer: "initialize" }
-        );
-        await upgradeableStaking.deployed();
-        console.log(
-            "UpgradeableStaking proxy address:",
-            upgradeableStaking.address
-        );
+        console.log("Staking contract address: ", staking.address);
+        console.log("Staking contract deployed at block:", receipt.blockNumber);
 
-        const stakingImplementationAddress =
-            await hre.upgrades.erc1967.getImplementationAddress(
-                upgradeableStaking.address
-            );
-        console.log(
-            "UpgradeableStaking implementation address:",
-            stakingImplementationAddress
-        );
-
-        // Set staking contract in TokenA
-        await upgradeableTokenA.setStakingContract(upgradeableStaking.address);
+        await tokenA.setStakingContract(staking.address);
         console.log("Staking contract set in TokenA");
-
-        // Get the current block number
-        const currentBlock = await hre.ethers.provider.getBlockNumber();
-        console.log("Current block number:", currentBlock);
 
         // Save frontend files
         console.log("Saving files to BE and FE...");
-        await saveFrontendFiles({
-            UpgradeableTokenA: upgradeableTokenA.address,
-            UpgradeableTokenAImplementation: tokenAImplementationAddress,
-            UpgradeableNFTB: upgradeableNFTB.address,
-            UpgradeableNFTBImplementation: nftBImplementationAddress,
-            UpgradeableStaking: upgradeableStaking.address,
-            UpgradeableStakingImplementation: stakingImplementationAddress,
+        saveFrontendFiles({
+            TokenA: tokenA.address,
+            NFTB: nftB.address,
+            Staking: staking.address,
         });
 
-        // Update backend configuration with the current block number
-        updateBackendConfig(currentBlock);
+        // Update backend configuration
+        updateBackendConfig(receipt.blockNumber);
 
         console.log("Deployment completed successfully.");
     } catch (error) {
@@ -108,7 +64,7 @@ async function main() {
     }
 }
 
-async function saveFrontendFiles(addresses) {
+function saveFrontendFiles(addresses) {
     const contractsDir = path.join(
         __dirname,
         "..",
@@ -145,23 +101,19 @@ async function saveFrontendFiles(addresses) {
         JSON.stringify(addresses, undefined, 2)
     );
 
-    const artifacts = [
-        "UpgradeableTokenA",
-        "UpgradeableNFTB",
-        "UpgradeableStaking",
-    ];
+    const myartifacts = ["TokenA", "NFTB", "Staking"];
 
-    for (const artifact of artifacts) {
-        const Artifact = await hre.artifacts.readArtifact(artifact);
+    myartifacts.forEach((artifact) => {
+        const ContractArtifact = artifacts.readArtifactSync(artifact);
         fs.writeFileSync(
             path.join(contractsDir, `${artifact}.json`),
-            JSON.stringify(Artifact, null, 2)
+            JSON.stringify(ContractArtifact, null, 2)
         );
         fs.writeFileSync(
             path.join(beContractDir, `${artifact}.json`),
-            JSON.stringify(Artifact, null, 2)
+            JSON.stringify(ContractArtifact, null, 2)
         );
-    }
+    });
 }
 
 function updateBackendConfig(deploymentBlockNumber) {

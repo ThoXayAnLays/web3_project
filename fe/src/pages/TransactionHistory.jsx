@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback  } from "react";
 import { ethers } from "ethers";
 import { useWeb3 } from "../contexts/Web3Context";
 import { useParams, useNavigate } from "react-router-dom";
@@ -42,27 +42,7 @@ const TransactionHistory = () => {
     const [lastCrawledBlock, setLastCrawledBlock] = useState(null);
     const [newAPR, setNewAPR] = useState("");
 
-    useEffect(() => {
-        if (isAdmin && !address) {
-            fetchTransactions();
-        } else if (address) {
-            fetchTransactions(address);
-        } else if (connectedAddress) {
-            navigate(`/history/${connectedAddress}`);
-        }
-        fetchLastCrawledBlock();
-        const intervalId = setInterval(() => {
-            if (isAdmin && !address) {
-                fetchTransactions();
-            } else if (address) {
-                fetchTransactions(address);
-            }
-            fetchLastCrawledBlock();
-        }, 30000);
-        return () => clearInterval(intervalId);
-    }, [isAdmin, address, connectedAddress, page, limit, sortBy, sortOrder]);
-
-    const fetchTransactions = async (userAddress = null) => {
+    const fetchTransactions = useCallback(async (userAddress = null) => {
         setLoading(true);
         setError(null);
         try {
@@ -95,13 +75,15 @@ const TransactionHistory = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [isAdmin, address, page, limit, sortBy, sortOrder, searchQuery]);
+
 
     const truncateAddress = (address) => {
+        if (!address) return 'N/A';
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
-    const fetchLastCrawledBlock = async () => {
+    const fetchLastCrawledBlock = useCallback(async () => {
         try {
             const response = await fetch(
                 `${import.meta.env.VITE_BE_API}/transactions/lastCrawledBlock`
@@ -115,7 +97,25 @@ const TransactionHistory = () => {
             console.error("Error fetching last crawled block:", error);
             toast.error("Failed to fetch last crawled block");
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (isAdmin && !address) {
+                await fetchTransactions();
+            } else if (address) {
+                await fetchTransactions(address);
+            } else if (connectedAddress) {
+                navigate(`/history/${connectedAddress}`);
+            }
+            await fetchLastCrawledBlock();
+        };
+
+        fetchData();
+
+        const intervalId = setInterval(fetchData, 1000);
+        return () => clearInterval(intervalId);
+    }, [isAdmin, address, connectedAddress, fetchTransactions, fetchLastCrawledBlock, navigate]);
 
     const handleSearch = () => {
         setPage(1);

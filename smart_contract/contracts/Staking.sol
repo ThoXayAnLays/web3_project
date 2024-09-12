@@ -3,19 +3,18 @@ pragma solidity ^0.8.0;
 
 import "./TokenA.sol";
 import "./NFTB.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
-    UpgradeableTokenA public tokenA;
-    UpgradeableNFTB public nftB;
+contract Staking is Ownable, ReentrancyGuard {
+    TokenA public tokenA;
+    NFTB public nftB;
 
     uint256 public constant LOCK_PERIOD = 30 seconds;
     uint256 public constant NFT_THRESHOLD = 1000000 * 10 ** 18;
-    uint256 public baseAPR;
-    uint256 public nftBonusAPR;
+    uint256 public baseAPR = 800;
+    uint256 public nftBonusAPR = 200;
 
     struct Stake {
         uint256 amount;
@@ -40,24 +39,12 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
     event NFTMinted(address indexed user, uint256 tokenId);
     event NFTWithdrawn(address indexed user, uint256 tokenId);
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
+    constructor(address _tokenA, address _nftB) Ownable(msg.sender) {
+        tokenA = TokenA(_tokenA);
+        nftB = NFTB(_nftB);
     }
 
-    function initialize(address _tokenA, address _nftB) public initializer {
-        __Ownable_init(msg.sender);
-        __UUPSUpgradeable_init();
-        
-        tokenA = UpgradeableTokenA(_tokenA);
-        nftB = UpgradeableNFTB(_nftB);
-        baseAPR = 800;
-        nftBonusAPR = 200;
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         require(
             tokenA.transferFrom(msg.sender, address(this), amount),
@@ -79,9 +66,11 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
             stake.nftDepositTime = block.timestamp;
         }
 
-        uint256 nftsToMint = stake.totalStakedAmount /
-            NFT_THRESHOLD -
-            mintedNFTs[msg.sender];
+        uint256 totalNFTsEarned = stake.totalStakedAmount / NFT_THRESHOLD;
+        uint256 nftsToMint = totalNFTsEarned > mintedNFTs[msg.sender] 
+            ? totalNFTsEarned - mintedNFTs[msg.sender]
+            : 0;
+
         for (uint256 i = 0; i < nftsToMint; i++) {
             uint256 tokenId = nftB.safeMint(msg.sender);
             emit NFTMinted(msg.sender, tokenId);
@@ -108,7 +97,7 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
         return ownedNFTs;
     }
 
-    function depositNFT(uint256 tokenId) external {
+    function depositNFT(uint256 tokenId) external nonReentrant {
         require(nftB.ownerOf(tokenId) == msg.sender, "You don't own this NFT");
         nftB.transferFrom(msg.sender, address(this), tokenId);
 
@@ -120,14 +109,16 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
         }
 
         stake.nftDepositTime = block.timestamp;
+
         stake.nftCount++;
         stakedNFTs[msg.sender].push(tokenId);
+
         stake.timestamp = block.timestamp;
 
         emit NFTDeposited(msg.sender, tokenId);
     }
 
-    function withdraw() external {
+    function withdraw() external nonReentrant {
         Stake storage stake = stakes[msg.sender];
         require(stake.amount > 0, "No stake to withdraw");
         require(
@@ -188,7 +179,7 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
         return stake.lockEndTime - block.timestamp;
     }
 
-    function withdrawNFTs(uint256[] calldata tokenIds) external {
+    function withdrawNFTs(uint256[] calldata tokenIds) external nonReentrant {
         Stake storage stake = stakes[msg.sender];
         require(stake.nftCount > 0, "No NFTs to withdraw");
         require(tokenIds.length > 0, "No NFTs selected for withdrawal");
@@ -228,7 +219,7 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
         }
     }
 
-    function claimReward() external {
+    function claimReward() external nonReentrant {
         Stake storage stake = stakes[msg.sender];
         require(stake.amount > 0, "No stake to claim reward from");
 
@@ -258,16 +249,12 @@ contract UpgradeableStaking is Initializable, OwnableUpgradeable, UUPSUpgradeabl
 
         if (stake.nftDepositTime > 0) {
             uint256 baseReward = Math.mulDiv(
-                stake.amount *
-                    baseAPR *
-                    (stake.nftDepositTime - stake.timestamp),
+                stake.amount * baseAPR * (stake.nftDepositTime - stake.timestamp),
                 1,
                 365 days * 10000
             );
             uint256 bonusReward = Math.mulDiv(
-                stake.amount *
-                    (baseAPR + nftBonusAPR * stake.nftCount) *
-                    (block.timestamp - stake.nftDepositTime),
+                stake.amount * (baseAPR + nftBonusAPR * stake.nftCount) * (block.timestamp - stake.nftDepositTime),
                 1,
                 365 days * 10000
             );

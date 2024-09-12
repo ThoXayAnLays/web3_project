@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useWeb3 } from '../contexts/Web3Context'
 import { Button, Typography, Menu, MenuItem } from '@mui/material'
 
 const Header = () => {
-    const { address, isAdmin, connectWallet, disconnectWallet, isConnected, tokenABalance, nftBBalance, baseAPR, stakingContract  } = useWeb3()
+    const { address, isAdmin, connectWallet, disconnectWallet, isConnected, tokenABalance, nftBBalance, baseAPR, stakingContract, updateBalances, tokenAContract, nftBContract } = useWeb3()
     const [anchorEl, setAnchorEl] = useState(null)
     const [localBaseAPR, setLocalBaseAPR] = useState(baseAPR)
 
@@ -33,19 +33,25 @@ const Header = () => {
         }
     }
 
+    const fetchAPR = useCallback(async () => {
+        if (stakingContract) {
+            const apr = await stakingContract.baseAPR()
+            setLocalBaseAPR(apr.toNumber() / 100)
+        }
+    }, [stakingContract])
+
     useEffect(() => {
-        const fetchAPR = async () => {
-            if (stakingContract) {
-                const apr = await stakingContract.baseAPR();
-                setLocalBaseAPR(apr.toNumber() / 100);
-            }
-        };
+        fetchAPR()
+        const interval = setInterval(fetchAPR, 10000)
 
-        fetchAPR();
-        const interval = setInterval(fetchAPR, 10000);
+        return () => clearInterval(interval)
+    }, [fetchAPR])
 
-        return () => clearInterval(interval);
-    }, [stakingContract]);
+    useEffect(() => {
+        if (isConnected && address) {
+            updateBalances(address, tokenAContract, nftBContract)
+        }
+    }, [isConnected, address, updateBalances, tokenAContract, nftBContract])
 
     const formatTokenAmount = (amount) => {
         return parseFloat(amount).toFixed(2)

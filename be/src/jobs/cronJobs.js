@@ -115,6 +115,7 @@ async function processEvents(fromBlock, toBlock) {
                         event.returnValues.amount ||
                         event.returnValues.reward ||
                         event.returnValues.newBaseAPR ||
+                        event.returnValues.tokenId ||
                         "0",
                     timestamp: new Date(Number(block.timestamp) * 1000),
                     transactionHash: event.transactionHash,

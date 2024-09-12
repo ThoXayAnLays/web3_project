@@ -10,12 +10,7 @@ async function getContractAddresses() {
     );
     try {
         const addressesJson = await fs.readFile(addressesPath, "utf-8");
-        const addresses = JSON.parse(addressesJson);
-        return {
-            TokenA: addresses.UpgradeableTokenA,
-            NFTB: addresses.UpgradeableNFTB,
-            Staking: addresses.UpgradeableStaking
-        };
+        return JSON.parse(addressesJson);
     } catch (error) {
         console.error("Error reading contract addresses:", error);
         throw error;
@@ -24,13 +19,13 @@ async function getContractAddresses() {
 
 async function getContractABIs() {
     const abis = {};
-    const contractNames = ["UpgradeableTokenA", "UpgradeableNFTB", "UpgradeableStaking"];
+    const contractNames = ["TokenA", "NFTB", "Staking"];
 
     for (const name of contractNames) {
         const abiPath = path.join(__dirname, "..", "contracts", `${name}.json`);
         try {
             const abiJson = await fs.readFile(abiPath, "utf-8");
-            abis[name.replace("Upgradeable", "")] = JSON.parse(abiJson).abi;
+            abis[name] = JSON.parse(abiJson).abi;
         } catch (error) {
             console.error(`Error reading ABI for ${name}:`, error);
             throw error;
@@ -40,23 +35,7 @@ async function getContractABIs() {
     return abis;
 }
 
-async function getDeploymentBlocks() {
-    const configPath = path.join(__dirname, "..", "config.js");
-    try {
-        const config = require(configPath);
-        return {
-            tokenA: config.DEPLOYMENT_BLOCK,
-            nftB: config.DEPLOYMENT_BLOCK,
-            staking: config.DEPLOYMENT_BLOCK,
-        };
-    } catch (error) {
-        console.error("Error reading deployment blocks:", error);
-        throw error;
-    }
-}
-
 module.exports = {
     getContractAddresses,
     getContractABIs,
-    getDeploymentBlocks,
 };
