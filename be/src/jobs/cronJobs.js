@@ -28,10 +28,15 @@ const eventNames = [
 ];
 
 async function initializeCrawling() {
-    const lastCrawledBlock = await LastCrawledBlock.findOne({ contractName: "Staking" });
+    const lastCrawledBlock = await LastCrawledBlock.findOne({
+        contractName: "Staking",
+    });
     const configDeploymentBlock = BigInt(config.DEPLOYMENT_BLOCK);
 
-    if (!lastCrawledBlock || BigInt(lastCrawledBlock.blockNumber) < configDeploymentBlock) {
+    if (
+        !lastCrawledBlock ||
+        BigInt(lastCrawledBlock.blockNumber) < configDeploymentBlock
+    ) {
         // New contract deployed or first run
         await Transaction.deleteMany({}); // Clear all old transactions
         await LastCrawledBlock.findOneAndUpdate(
@@ -39,7 +44,9 @@ async function initializeCrawling() {
             { blockNumber: configDeploymentBlock.toString() },
             { upsert: true }
         );
-        console.log("Cleared old data and reset last crawled block to deployment block");
+        console.log(
+            "Cleared old data and reset last crawled block to deployment block"
+        );
     }
 }
 
@@ -80,7 +87,6 @@ async function updateLastCrawledBlock(blockNumber) {
     );
 }
 
-
 async function processEvents(fromBlock, toBlock) {
     console.log(`Processing events from block ${fromBlock} to ${toBlock}`);
 
@@ -111,12 +117,9 @@ async function processEvents(fromBlock, toBlock) {
                         event.returnValues.from,
                     toAddress: event.address,
                     eventType: event.event,
-                    amount:
-                        event.returnValues.amount ||
-                        event.returnValues.reward ||
-                        event.returnValues.newBaseAPR ||
-                        event.returnValues.tokenId ||
-                        "0",
+                    amount: "0",
+                    tokenId: null,
+                    aprValue: null,
                     timestamp: new Date(Number(block.timestamp) * 1000),
                     transactionHash: event.transactionHash,
                     blockNumber: event.blockNumber.toString(),
@@ -124,8 +127,33 @@ async function processEvents(fromBlock, toBlock) {
                     logIndex: event.logIndex.toString(),
                 };
 
+                if (event.event === 'APRUpdated') {
+                    transactionData.aprValue = event.returnValues.newBaseAPR.toString();
+                } else if (event.returnValues.amount) {
+                    transactionData.amount = event.returnValues.amount.toString();
+                } else if (event.returnValues.reward) {
+                    transactionData.amount = event.returnValues.reward.toString();
+                }
+
+                // Handle tokenId separately
+                if (event.returnValues.tokenId) {
+                    transactionData.tokenId =
+                        event.returnValues.tokenId.toString();
+                }
+
+                // Convert amount to string if it's a BigNumber
+                if (
+                    typeof transactionData.amount === "object" &&
+                    transactionData.amount.toString
+                ) {
+                    transactionData.amount = transactionData.amount.toString();
+                }
+
                 await Transaction.findOneAndUpdate(
-                    { transactionHash: transactionData.transactionHash, logIndex: transactionData.logIndex },
+                    {
+                        transactionHash: transactionData.transactionHash,
+                        logIndex: transactionData.logIndex,
+                    },
                     transactionData,
                     { upsert: true, new: true }
                 );
@@ -209,7 +237,9 @@ function startCronJobs() {
     initializeContracts().then(() => {
         initializeCrawling().then(() => {
             const job = schedule.scheduleJob(CRON_SCHEDULE, crawlEvents);
-            console.log(`Cron job scheduled to run according to schedule: ${CRON_SCHEDULE}`);
+            console.log(
+                `Cron job scheduled to run according to schedule: ${CRON_SCHEDULE}`
+            );
             crawlEvents(); // Run immediately after startup
         });
     });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback  } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 import { useWeb3 } from "../contexts/Web3Context";
 import { useParams, useNavigate } from "react-router-dom";
@@ -42,44 +42,46 @@ const TransactionHistory = () => {
     const [lastCrawledBlock, setLastCrawledBlock] = useState(null);
     const [newAPR, setNewAPR] = useState("");
 
-    const fetchTransactions = useCallback(async (userAddress = null) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const baseUrl = `${import.meta.env.VITE_BE_API}/transactions`;
-            const url =
-                isAdmin && !userAddress
-                    ? `${baseUrl}/all`
-                    : `${baseUrl}/user/${userAddress || address}`;
+    const fetchTransactions = useCallback(
+        async (userAddress = null) => {
+            setLoading(true);
+            setError(null);
+            try {
+                const baseUrl = `${import.meta.env.VITE_BE_API}/transactions`;
+                const url =
+                    isAdmin && !userAddress
+                        ? `${baseUrl}/all`
+                        : `${baseUrl}/user/${userAddress || address}`;
 
-            const queryParams = new URLSearchParams({
-                page,
-                limit,
-                sortBy,
-                sortOrder,
-                search: searchQuery,
-            }).toString();
+                const queryParams = new URLSearchParams({
+                    page,
+                    limit,
+                    sortBy,
+                    sortOrder,
+                    search: searchQuery,
+                }).toString();
 
-            const response = await fetch(`${url}?${queryParams}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const response = await fetch(`${url}?${queryParams}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                setTransactions(data.docs);
+                setTotalPages(data.totalPages);
+                setTotalTransactions(data.totalDocs);
+            } catch (error) {
+                console.error("Error fetching transactions:", error);
+                setError(error.message);
+                toast.error(`Failed to fetch transactions: ${error.message}`);
+            } finally {
+                setLoading(false);
             }
-            const data = await response.json();
-            setTransactions(data.docs);
-            setTotalPages(data.totalPages);
-            setTotalTransactions(data.totalDocs);
-        } catch (error) {
-            console.error("Error fetching transactions:", error);
-            setError(error.message);
-            toast.error(`Failed to fetch transactions: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    }, [isAdmin, address, page, limit, sortBy, sortOrder, searchQuery]);
-
+        },
+        [isAdmin, address, page, limit, sortBy, sortOrder, searchQuery]
+    );
 
     const truncateAddress = (address) => {
-        if (!address) return 'N/A';
+        if (!address) return "N/A";
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
@@ -115,7 +117,14 @@ const TransactionHistory = () => {
 
         const intervalId = setInterval(fetchData, 1000);
         return () => clearInterval(intervalId);
-    }, [isAdmin, address, connectedAddress, fetchTransactions, fetchLastCrawledBlock, navigate]);
+    }, [
+        isAdmin,
+        address,
+        connectedAddress,
+        fetchTransactions,
+        fetchLastCrawledBlock,
+        navigate,
+    ]);
 
     const handleSearch = () => {
         setPage(1);
@@ -209,13 +218,12 @@ const TransactionHistory = () => {
                         type="number"
                         value={newAPR}
                         onChange={(e) => setNewAPR(e.target.value)}
-                        disabled={loading}
                     />
                     <Button
                         variant="contained"
                         color="primary"
                         onClick={handleUpdateAPR}
-                        disabled={loading || !newAPR || isNaN(newAPR)}
+                        disabled={!newAPR || isNaN(newAPR)}
                     >
                         Update APR
                     </Button>
@@ -253,6 +261,8 @@ const TransactionHistory = () => {
                             <TableCell>From</TableCell>
                             <TableCell>To</TableCell>
                             <TableCell>Amount (ETH)</TableCell>
+                            <TableCell>Token ID</TableCell>
+                            <TableCell>APR (%)</TableCell>
                             <TableCell>Gas Used (Wei)</TableCell>
                             <TableCell>Timestamp</TableCell>
                         </TableRow>
@@ -309,9 +319,32 @@ const TransactionHistory = () => {
                                     </Link>
                                 </TableCell>
                                 <TableCell>
-                                    {formatTokenAmount(
-                                        ethers.utils.formatEther(tx.amount)
-                                    )}
+                                    {tx.eventType !== "APRUpdated" &&
+                                    tx.eventType !== "NFTMinted" &&
+                                    tx.eventType !== "NFTDeposited" &&
+                                    tx.eventType !== "NFTWithdrawn"
+                                        ? formatTokenAmount(
+                                            ethers.utils.formatEther(
+                                                tx.amount
+                                            )
+                                        )
+                                        : "-"}
+                                </TableCell>
+                                <TableCell>
+                                    {(tx.eventType === "NFTMinted" ||
+                                        tx.eventType === "NFTDeposited" ||
+                                        tx.eventType === "NFTWithdrawn") &&
+                                    tx.tokenId
+                                        ? tx.tokenId
+                                        : "-"}
+                                </TableCell>
+                                <TableCell>
+                                    {tx.eventType === "APRUpdated" &&
+                                    tx.aprValue
+                                        ? `${(
+                                              parseFloat(tx.aprValue) / 100
+                                          ).toFixed(2)}`
+                                        : "-"}
                                 </TableCell>
                                 <TableCell>{tx.gasUsed}</TableCell>
                                 <TableCell>

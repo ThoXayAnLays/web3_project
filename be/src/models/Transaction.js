@@ -30,6 +30,14 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    tokenId: {
+        type: String,
+        default: null,
+    },
+    aprValue: {
+        type: String,
+        default: null,
+    },
     timestamp: {
         type: Date,
         required: true,

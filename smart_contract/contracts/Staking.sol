@@ -35,7 +35,7 @@ contract Staking is Ownable, ReentrancyGuard {
     event NFTDeposited(address indexed user, uint256 tokenId);
     event Withdrawn(address indexed user, uint256 amount, uint256 reward);
     event RewardClaimed(address indexed user, uint256 reward);
-    event APRUpdated(uint256 newBaseAPR);
+    event APRUpdated(address indexed user, uint256 newBaseAPR);
     event NFTMinted(address indexed user, uint256 tokenId);
     event NFTWithdrawn(address indexed user, uint256 tokenId);
 
@@ -281,7 +281,7 @@ contract Staking is Ownable, ReentrancyGuard {
 
     function updateBaseAPR(uint256 newBaseAPR) external onlyOwner {
         baseAPR = newBaseAPR;
-        emit APRUpdated(newBaseAPR);
+        emit APRUpdated(msg.sender, newBaseAPR);
     }
 
     function getMintedNFTCount(address user) external view returns (uint256) {
