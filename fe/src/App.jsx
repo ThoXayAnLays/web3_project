@@ -6,6 +6,7 @@ import Box from '@mui/material/Box'
 import Header from './components/Header'
 import UserDashboard from './pages/UserDashboard'
 import TransactionHistory from './pages/TransactionHistory'
+import NotFound from './components/NotFound'
 import { useWeb3 } from './contexts/Web3Context'
 import { Alert } from '@mui/material'
 import theme from './theme'
@@ -36,6 +37,7 @@ function App() {
                             <Route path="/" element={<UserDashboard />} />
                             <Route path="/history" element={<TransactionHistory />} />
                             <Route path="/history/:address" element={<TransactionHistory />} />
+                            <Route path="*" element={<NotFound />} />
                         </Routes>
                     </Box>
                 </Box>

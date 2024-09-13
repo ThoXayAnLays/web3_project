@@ -81,7 +81,7 @@ const UserDashboard = () => {
             const interval = setInterval(() => {
                 fetchRemainingLockTime();
                 fetchTotalReward();
-            }, 30000);
+            }, 1000);
             return () => clearInterval(interval);
         }
     }, [address, stakingContract, fetchRemainingLockTime, fetchTotalReward]);
